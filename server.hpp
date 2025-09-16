@@ -19,7 +19,7 @@ class Server{
 		int	port;
 		std::string pass;
 		int	sock;
-		sockaddr_in	dir;//direccion del server
+		sockaddr_in	dir;//direccion de socket ipv4
 		std::vector<struct pollfd> pollfd;//tendremos un pollfd para el server
 		//y luego uno por cliente q se conecte
 		//std::list<Client &> client_list;
