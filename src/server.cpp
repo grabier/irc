@@ -1,4 +1,5 @@
 #include "../server.hpp"
+ #include "../client.hpp"
 
 Server::Server(int p, std::string pa){
 	port = p;
@@ -8,7 +9,7 @@ Server::Server(int p, std::string pa){
 	bind(sock, (sockaddr *)&dir, sizeof(dir));//enlaza socket con address(direccion + puerto)
 	//escuchamos->listen marca al servidor listo para aceptar conexiones
 	listen(sock, 1024);//habra q meter las q queramos. numero de conexiones en cola
-	poll_server();
+	poll_server();//inicializamos el pollfd del server
 }
 
 int	Server::init_server_socket(){
@@ -52,46 +53,47 @@ void  Server::poll_server(){
 	this->pollfd.push_back(pfd);
 }
 
-
 int	Server::monitor_poll(){
 	int	res;
 	res = poll(&pollfd[0], pollfd.size(), -1);
 	/* if (res == -1)
 		return (-1); */
-	/* if (res == 0)
-		return (std::cout << "timeout\n", -1); */
+	if (res == 0)
+		return (std::cout << "timeout\n", -1);
 	return (res);//numero de pollfd q tienen revents validos
 }
 
-std::string  Server::handle_message(int fd){
-	int a;
-	char	aux[1024];
-	std::string	buff;
-	while (1)
-	{
-		a = recv(fd, aux, 1024, 0);//recive los mensajes en aux
-		//es basicamente el read para sockets
-		if (a == 0){
-			std::cout << "cliente finaliza\n";
-			exit (1);
+int  Server::who_is_event(){
+	unsigned int	i = 0;
+	//std::cout << "DEBUGAMOS\n";
+	while(i < pollfd.size()){//recorremos todos los eventos
+		if (pollfd[i].revents > 0){
+			if (pollfd[i].fd == sock){
+				//checkeamos el fd asociado al server
+				//si el evento es en el server->alguien intenta conectarr
+				//alguien ha puesto bien el puerto y la ip
+				std::cout << "created a cliento\n";
+				add_new_client();
+			}
+			else
+			{
+				std::cout << "handle a cliento\n";
+				handle_message(pollfd[i].fd);
+			}
 		}
-		//std::cout << "DEBUGAMOS\n";
-		if (aux[a - 1] == '\n'){//creo q hay q checkear por /t/n
-			std::cout << aux;
-			break ;
-		}
-		buff.append(aux);
+		//buscar por revents = 0 else
+		i++;
 	}
-	return (buff);
+	return (0);
 }
 
-
-void  Server::new_client(){
+void  Server::add_new_client(){
 	sockaddr_in	address;
 	socklen_t	len  = sizeof(address);
 	int	sockfd;
 	//devuelve el fd del socket del cliente
 	sockfd = accept(sock, (sockaddr *)&address, &len);//la misma idea q socket pero pal cliente
+	//configuramos el socket del cliente.
 	if (sockfd < 0)
 		exit(21);
 	fcntl(sockfd, F_SETFL, O_NONBLOCK);
@@ -101,31 +103,61 @@ void  Server::new_client(){
 	pfd.events = POLLIN;
 	pfd.revents = 0;
 	this->pollfd.push_back(pfd);
+	Client new_client(sockfd, address);
+	client_list.push_back(&new_client);//añadimos a la lista
 	//std::cout << "created a cliento\n";
 }
 
-int  Server::who_is_event(){
-	unsigned int	i = 0;
-	//std::cout << "DEBUGAMOS\n";
-	while(i < pollfd.size()){//recorremos todos los eventos
-		if (pollfd[i].revents > 0){
-			if (pollfd[i].fd == sock){//si el evento es en el server->alguien intenta conectarr
-				//alguien ha puesto bien el puerto y la ip
-				std::cout << "created a cliento\n";
-				new_client();
-			}
-			else{//el evento es en un cliente ->comandos y demas
-				std::cout << "handle a cliento\n";
-				handle_message(pollfd[i].fd);
-			}
+std::string  Server::handle_message(int fd){
+	int a;
+	char	aux[1024];
+	std::string	buff;
+	std::string	line;
+	size_t	pos = 0;
+	while (1)
+	{
+		a = recv(fd, aux, 1024, 0);//recive los mensajes en aux
+		//es basicamente el read para sockets
+		buff.append(aux);
+		while ((pos = buff.find("\n")) != std::string::npos) {
+			std::string line = buff.substr(0, pos);
+
+			// quitar posible \r al final
+			if (!line.empty() && line[line.size() - 1] == '\r')
+				line.resize(line.size() - 1);
+
+			buff.erase(0, pos + 1);
+			//processCommand(line);
 		}
-		i++;
+		/* while ((pos = buff.find("\r\n"))) {
+			line = buff.substr(0, pos);
+			buff.erase(0, pos + 2); // +2 para quitar \r\n
+			//std::cout << line << std::endl;
+		} */
+		std::cout << line << std::endl;
+		break;
+		if (a == 0){
+			std::cout << "cliente finaliza\n";
+			exit (1);
+		}
+		//std::cout << "DEBUGAMOS\n";
+		/* if (aux[a - 1] == '\n' && aux[a - 2] == '\t'){//creo q hay q checkear por /t/n
+			std::cout << aux;
+			break ;
+		} */
+		buff.append(aux);
 	}
-	return (0);
+	return (buff);
 }
 
-
-
+/* Client Server::get_client(int fd){
+	for(int i = 0; i < client_list.size(); i++){
+		if (fd == client_list[i]->get_sock_fd()){
+			if (client_list[i]->get_register_status() == 0)//si no esta registrado(nick + user), pedimos documentasiao
+				ask_for_authentication();
+		}
+	}
+} */
 
 std::vector<struct pollfd>	Server::get_pollfd(){
 	return pollfd;

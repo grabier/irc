@@ -13,6 +13,9 @@
  #include <vector>
  #include <netinet/in.h>//pa sockaddr_in
  #include <stdint.h>
+ #include "client.hpp"
+
+ class Client;
 
 class Server{
 	private:
@@ -22,7 +25,7 @@ class Server{
 		sockaddr_in	dir;//direccion de socket ipv4
 		std::vector<struct pollfd> pollfd;//tendremos un pollfd para el server
 		//y luego uno por cliente q se conecte
-		//std::list<Client &> client_list;
+		std::vector<Client *> client_list;
 	public:
 		Server(int, std::string);
 		int	init_server_socket();
@@ -31,8 +34,9 @@ class Server{
 		std::vector<struct pollfd>	get_pollfd();
 		void	poll_server();
 		int	who_is_event();
-		void	new_client();
+		void	add_new_client();
 		std::string	handle_message(int);
+		Client get_client(int);
 		~Server();
 };
 #endif

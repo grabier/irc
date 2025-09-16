@@ -6,7 +6,7 @@ CC = c++
 
 SRC_DIR = ./src
 
-SRCS := ./src/server.cpp ./src/main.cpp
+SRCS := ./src/server.cpp ./src/main.cpp  ./src/client.cpp
 
 OBJ_DIR = ./objs
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
