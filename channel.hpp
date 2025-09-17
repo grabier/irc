@@ -1,5 +1,5 @@
-#ifndef SERVER_HPP
-# define SERVER_HPP
+#ifndef CHANNEL_HPP
+# define CHANNEL_HPP
 
 # include <iostream>
 # include <sstream>
@@ -13,7 +13,8 @@
 # include <list>
 # include <vector>
 # include <stdint.h>
-# include <client.hpp>
+
+class	Client;
 
 class	Channel
 {
@@ -41,7 +42,7 @@ public:
 
 	Channel( const std::string& name );
 
-	bool		addClient( Client& client );
+	bool		addClient( Client& client, const std::string& key );
 	bool		removeClient( const Client& client );
 	bool		hasClient( const Client& client );
 	std::string	getName( void ) const;
@@ -51,16 +52,17 @@ public:
 	bool		removeInvitedClient( const Client& client );
 	bool		isOperator( const Client& client );
 	bool		isInvitedClient( const Client& client );
-	bool		setTopic( std::string& topic );
-	std::string	getTopic( void );
-	bool		kickClient( const Client& client );
+	bool		setTopic( std::string& topic, Client& client );
+	std::string	getTopic( void ) const;
+	bool		kickClient( const Client& kicker, Client& target );
 	bool		inviteClient( Client & inviter, Client& client );
-	bool		setMode( char mode, std::string param, Client& client );
-	bool		removeMode( char mode, Client& client );
+	bool		setMode( char mode, std::string param, Client& requester, Client& target );
+	bool		removeMode( char mode, Client& requester, Client& target );
+	bool		validateKey( const std::string& key );
 	bool		isInviteOnly( void );
 	bool		isTopicRestricted( void );
 	bool		broadcastMessage( const std::string message );
-	bool		canJoin( const Client& client );
+	bool		canJoin( Client& client, const std::string& key );
 
 };
 
