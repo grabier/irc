@@ -1,19 +1,19 @@
 #ifndef SERVER_HPP
-#define SERVER_HPP
+# define SERVER_HPP
 
- #include <iostream>
- #include <string.h>
- #include <fcntl.h>
- #include <sys/socket.h>
- #include <unistd.h>
- #include <stdlib.h>
- #include <cstdio>
- #include <poll.h>
- #include <list>
- #include <vector>
- #include <netinet/in.h>//pa sockaddr_in
- #include <stdint.h>
- #include "client.hpp"
+# include <iostream>
+# include <string.h>
+# include <fcntl.h>
+# include <sys/socket.h>
+# include <unistd.h>
+# include <stdlib.h>
+# include <cstdio>
+# include <poll.h>
+# include <list>
+# include <vector>
+# include <netinet/in.h>//pa sockaddr_in
+# include <stdint.h>
+# include "client.hpp"
 
  class Client;
 

@@ -52,10 +52,9 @@ _has_key(false), _has_client_limit(false),
 _client_list(), _operators(), _invited_clients()
 {}
 
-bool	Channel::addClient(Client& client)
+bool	Channel::addClient(Client& client, const std::string& key)
 {
-	if ((this->_has_client_limit && this->_client_list.size() < this->_client_limit
-		|| !this->_has_client_limit))
+	if (canJoin(client, key))
 	{
 		this->_client_list.push_back(&client);
 		return (true);
@@ -68,7 +67,7 @@ bool	Channel::removeClient(const Client& client)
 	for (std::list<Client*>::iterator it = this->_client_list.begin();
 		it != this->_client_list.end(); it++)
 	{
-		if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+		if (&client == *it)
 		{
 			this->_client_list.erase(it);
 			return (true);
@@ -81,7 +80,7 @@ bool	Channel::hasClient(const Client& client) // checks if client is un channel
 {
 	for (std::list<Client*>::iterator it = this->_client_list.begin();
 		it != this->_client_list.end(); it++)
-		if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+		if (&client == *it)
 			return (true);
 	return (false);
 }
@@ -103,18 +102,12 @@ bool	Channel::addOperator(Client& client)
 		for (std::list<Client*>::iterator it = this->_client_list.begin();
 			it != this->_client_list.end(); it++)
 		{
-			if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+			if (&client == *it)
 			{
-				// quizas haya que cambiar algun atributo en Client tmb -> Client::isOperator(client)
 				this->_operators.push_back(*it);
 				return (true);
 			}
 		}
-	}
-	else
-	{
-		this->_operators.push_back(&client);
-		return (true);
 	}
 	return (false);
 }
@@ -124,7 +117,7 @@ bool	Channel::removeOperator(const Client& client)
 	for (std::list<Client*>::iterator it = this->_operators.begin();
 		it != this->_operators.end(); it++)
 	{
-		if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+		if (&client == *it)
 		{
 			this->_operators.erase(it);
 			return (true);
@@ -138,7 +131,7 @@ bool	Channel::removeInvitedClient(const Client& client)
 	for (std::list<Client*>::iterator it = this->_invited_clients.begin();
 		it != this->_invited_clients.end(); it++)
 	{
-		if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+		if (&client == *it)
 		{
 			this->_invited_clients.erase(it);
 			return (true);
@@ -151,7 +144,7 @@ bool	Channel::isOperator(const Client& client)
 {
 	for (std::list<Client*>::iterator it = this->_operators.begin();
 		it != this->_operators.end(); it++)
-		if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+		if (&client == *it)
 			return (true);
 	return (false);
 }
@@ -160,14 +153,14 @@ bool	Channel::isInvitedClient(const Client& client)
 {
 	for (std::list<Client*>::iterator it = this->_invited_clients.begin();
 		it != this->_invited_clients.end(); it++)
-		if (getClientName(client) == getClientName(it)) // esto lo debe implementar Client
+		if (&client == *it)
 			return (true);
 	return (false);
 }
 
-bool	Channel::setTopic(std::string& topic)
+bool	Channel::setTopic(std::string& topic, Client& client)
 {
-	if (!this->_topic_restricted)
+	if (!this->_topic_restricted || isOperator(client))
 	{
 		this->_topic = topic;
 		return (true);
@@ -175,19 +168,24 @@ bool	Channel::setTopic(std::string& topic)
 	return (false);
 }
 
-std::string	Channel::getTopic(void)
+std::string	Channel::getTopic(void) const
 {
 	return (this->_topic);
 }
 
-bool	Channel::kickClient(const Client& client) // requires privileges, and broadcasts a message 
+bool	Channel::kickClient(const Client& kicker, Client& target)
 {
-	if (isOperator(client))
-		removeOperator(client);
-	if (isInvitedClient(client))
-		removeInvitedClient(client);
-	if (removeClient(client))
+	if (!isOperator(kicker))
+		return (false);
+	if (isOperator(target))
+		removeOperator(target);
+	if (isInvitedClient(target))
+		removeInvitedClient(target);
+	if (removeClient(target))
+	{
+		broadcastMessage(target.get_user() + " has been kicked out!");
 		return (true);
+	}
 	return (false);
 }
 
@@ -201,25 +199,30 @@ bool	Channel::inviteClient(Client&inviter, Client& client)
 	return (true);
 }
 
-bool	Channel::setMode(char mode, std::string param, Client& client)
+bool	Channel::setMode(char mode, std::string param, Client& requester, Client& target)
 {
+	if (!isOperator(requester))
+		return (false);
 	if (mode == 'i')
 	{
 		(void)param;
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_invite_only = true;
 		return (true);
 	}
 	if (mode == 't')
 	{
 		(void)param;
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_topic_restricted = true;
 		return (true);
 	}
 	if (mode == 'k')
 	{
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_has_key = true;
 		this->_key = param;
 		return (true);
@@ -227,7 +230,7 @@ bool	Channel::setMode(char mode, std::string param, Client& client)
 	if (mode == 'o')
 	{
 		(void)param;
-		addOperator(client);
+		addOperator(target);
 		return (true);
 	}
 	if (mode == 'l')
@@ -235,50 +238,67 @@ bool	Channel::setMode(char mode, std::string param, Client& client)
 		for (int i = 0; param[i]; i++)
 			if (!isdigit(param[i]))
 				return (false);
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_has_client_limit = true;
 		std::istringstream s(param);
 		int number;
 		s >> number;
-		this->_client_limit = number;
+		if (number > 0 && number < 10000)
+			this->_client_limit = number;
+		else
+			return (false);
 		return (true);
 	}
 	return (false);
 }
 
-bool	Channel::removeMode(char mode, Client& client)
+bool	Channel::removeMode(char mode, Client& requester, Client& target)
 {
+	if (!isOperator(requester))
+		return (false);
 	if (mode == 'i')
 	{
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_invite_only = false;
 		return (true);
 	}
 	if (mode == 't')
 	{
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_topic_restricted = false;
 		return (true);
 	}
 	if (mode == 'k')
 	{
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_has_key = false;
 		this->_key = "";
 		return (true);
 	}
 	if (mode == 'o')
 	{
-		if (!isOperator(client))
-			return (false);
-		removeOperator(client);
+		removeOperator(target);
 		return (true);
 	}
 	if (mode == 'l')
 	{
-		(void)client;
+		(void)requester;
+		(void)target;
 		this->_has_client_limit = false;
+		return (true);
 	}
+	return (false);
+}
+
+bool	Channel::validateKey(const std::string& key)
+{
+	if (!this->_has_key)
+		return (true);
+	return (key == this->_key);
 }
 
 bool	Channel::isInviteOnly(void)
@@ -297,16 +317,44 @@ bool	Channel::isTopicRestricted(void)
 
 bool	Channel::broadcastMessage(const std::string message)
 {
-	// Send message to all clients of this channel
+	if (_client_list.empty())
+		return false;
+
+	// Add IRC protocol line ending if not present
+	std::string formatted_message = message;
+	if (formatted_message.length() < 2 || 
+		formatted_message.substr(formatted_message.length() - 2) != "\r\n")
+	{
+		formatted_message += "\r\n";
+	}
+
+	for (std::list<Client*>::iterator it = _client_list.begin(); 
+			it != _client_list.end(); ++it)
+	{
+		Client* client = *it;
+		ssize_t bytes_sent = send(client->get_sock_fd(), 
+									formatted_message.c_str(), 
+									formatted_message.length(), 
+									MSG_NOSIGNAL);
+	
+		if (bytes_sent == -1)
+		{
+			// Log error or handle disconnected client
+			continue;
+		}
+	}
+	return true;
 }
 
-bool	Channel::canJoin(const Client& client)
+bool	Channel::canJoin(Client& client, const std::string& key)
 {
-	if (this->_invite_only)
+	if (hasClient(client) || !client.isRegistered())
+		return (false);
+	if (this->_invite_only && !isInvitedClient(client))
 		return (false);
 	if (this->_has_client_limit && this->_client_limit <= this->_client_list.size())
 		return (false);
-	if (this->_has_key /*&& this->_key != client.key  o similar*/)
+	if (!validateKey(key))
 		return (false);
 	return (true);
 }
