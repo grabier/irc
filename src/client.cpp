@@ -3,22 +3,29 @@
 Client::Client(void)
 : _sock_fd(), _address(),
 _nick(), _user(), _real_name(),
-_isAuthenticated(false), _isNick_set(false),
-_isUser_set(false), _isRegistered(false),
+_isNick_set(false), _isUser_set(false),
+_isAuthenticated(false), _isRegistered(false),
 _channels(), _message_buffer()
 {}
 
-Client::Client(const Client& other) {}
+Client::Client(const Client& other) 
+{
+	(void)other;
+}
 
-Client& Client::operator=(const Client& other) {}
+Client& Client::operator=(const Client& other) 
+{
+	(void)other;
+	return (*this);
+}
 
 Client::~Client(void) {}
 
 Client::Client(int fd, sockaddr_in address)
 : _sock_fd(fd), _address(address),
 _nick(), _user(), _real_name(),
-_isAuthenticated(false), _isNick_set(false),
-_isUser_set(false), _isRegistered(false),
+_isNick_set(false), _isUser_set(false),
+_isAuthenticated(false), _isRegistered(false),
 _channels(), _message_buffer()
 {}
 
