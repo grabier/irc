@@ -1,15 +1,15 @@
 NAME = irc
 
-CFLAGS = -Wall -g -Wextra -Werror -std=c++98 #-fsanitize=address
+CFLAGS = -Wall -g -Wextra -Werror -std=c++98 -I. #-fsanitize=address
 
 CC = c++
 
 SRC_DIR = ./src
 
-SRCS := ./src/server.cpp ./src/main.cpp  ./src/client.cpp
+SRCS := ./src/server.cpp ./src/main.cpp ./src/client.cpp ./src/channel.cpp ./src/message.cpp
 
 OBJ_DIR = ./objs
-OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 # Colors
 RED     			= \033[0;31m
@@ -27,7 +27,7 @@ $(NAME): $(OBJ_DIR) $(OBJS)
 	@$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
 	@printf "$(GREEN)[Success] $(NAME) created successfully!\n$(RESET)"
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	@printf "$(YELLOW)[Compiling]$(RESET) $<\n"
 	@$(CC) $(CFLAGS) -c $< -o $@
