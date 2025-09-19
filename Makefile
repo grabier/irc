@@ -6,7 +6,7 @@ CC = c++
 
 SRC_DIR = ./src
 
-SRCS := ./src/server.cpp ./src/main.cpp ./src/client.cpp ./src/channel.cpp ./src/message.cpp ./src/parser.cpp
+SRCS := ./src/server.cpp ./src/main.cpp ./src/client.cpp ./src/channel.cpp ./src/message.cpp ./src/parser.cpp ./src/command_router.cpp
 
 OBJ_DIR = ./objs
 OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
