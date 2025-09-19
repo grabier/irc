@@ -6,7 +6,7 @@
 /*   By: sstoev <sstoev@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/18 22:28:44 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/18 22:28:47 by sstoev           ###   ########.fr       */
+/*   Updated: 2025/09/18 23:36:59 by sstoev           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,7 @@
 # include <string>
 # include <vector>
 
-class Message {
+class	Message {
 	private:
 		std::string	_prefix;
 		std::string	_command;
