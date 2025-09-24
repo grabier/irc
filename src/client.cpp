@@ -16,6 +16,7 @@ Client::Client(const Client& other)
 Client& Client::operator=(const Client& other) 
 {
 	(void)other;
+	(void)_address;
 	return (*this);
 }
 

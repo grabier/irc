@@ -10,6 +10,20 @@ Server::Server(int p, std::string pa){
 	//escuchamos->listen marca al servidor listo para aceptar conexiones
 	listen(sock, 1024);//habra q meter las q queramos. numero de conexiones en cola
 	poll_server();//inicializamos el pollfd del server
+
+	_commandRouter = new CommandRouter(*this);
+}
+
+Server::~Server() {
+	for (std::vector<Channel*>::iterator it = channel_list.begin(); it != channel_list.end(); ++it) {
+		delete *it;
+	}
+
+	for (std::vector<Client*>::iterator it = client_list.begin(); it != client_list.end(); ++it) {
+		delete *it;
+	}
+
+	delete _commandRouter;
 }
 
 int	Server::init_server_socket(){
@@ -66,6 +80,8 @@ int	Server::monitor_poll(){
 int  Server::who_is_event(){
 	unsigned int	i = 0;
 	//std::cout << "DEBUGAMOS\n";
+	std::vector<struct pollfd>::iterator it;
+	it = pollfd.begin();
 	while(i < pollfd.size()){//recorremos todos los eventos
 		if (pollfd[i].revents > 0){
 			if (pollfd[i].fd == sock){
@@ -78,7 +94,8 @@ int  Server::who_is_event(){
 			else
 			{
 				std::cout << "handle a cliento\n";
-				handle_message(pollfd[i].fd);
+				if (handle_message(pollfd[i].fd) == "")
+					pollfd.erase(it + i);
 			}
 		}
 		//buscar por revents = 0 else
@@ -103,8 +120,10 @@ void  Server::add_new_client(){
 	pfd.events = POLLIN;
 	pfd.revents = 0;
 	this->pollfd.push_back(pfd);
-	Client new_client(sockfd, address);
-	client_list.push_back(&new_client);//añadimos a la lista
+
+	// Changed to use heap allocation instead of stack as we need Client instances to persist
+	Client* new_client = new Client(sockfd, address);
+	client_list.push_back(new_client);//añadimos a la lista
 	//std::cout << "created a cliento\n";
 }
 
@@ -116,10 +135,17 @@ std::string  Server::handle_message(int fd){
 	size_t	pos = 0;
 	while (1)
 	{
-		a = recv(fd, aux, 1024, 0);//recive los mensajes en aux
+		a = recv(fd, aux, sizeof(aux) - 1, 0);//recive los mensajes en aux
+		if (a == 0) {
+			std::cout << "cliente finaliza\n";
+
+			// Instead of exit(1), handle client disconnect gracefully to prevent memory leaks
+			removeClientByFd(fd);
+			return (buff);
+		}
 		//es basicamente el read para sockets
 		buff.append(aux);
-		while ((pos = buff.find("\n")) != std::string::npos) {
+		while ((pos = buff.find("\n")) != std::string::npos && buff != ""){
 			std::string line = buff.substr(0, pos);
 
 			// quitar posible \r al final
@@ -127,19 +153,31 @@ std::string  Server::handle_message(int fd){
 				line.resize(line.size() - 1);
 
 			buff.erase(0, pos + 1);
-			//processCommand(line);
+			std::cout << "line: " << line << std::endl;
+			
+			// Parse and process command
+			if (!line.empty()) {
+				Message msg = _parser.parseMessage(line);
+				CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
+				if (result == CommandRouter::CMD_ERROR){
+					//std::cout << "sale x aki\n";
+					//line.erase(0, line.size());
+					return "";
+				}
+				// Handle cmd results
+				if (result == CommandRouter::CMD_DISCONNECT) {
+					removeClientByFd(fd);
+					return (buff);
+				}
+			}
 		}
 		/* while ((pos = buff.find("\r\n"))) {
 			line = buff.substr(0, pos);
 			buff.erase(0, pos + 2); // +2 para quitar \r\n
 			//std::cout << line << std::endl;
 		} */
-		std::cout << line << std::endl;
-		break;
-		if (a == 0){
-			std::cout << "cliente finaliza\n";
-			exit (1);
-		}
+		//std::cout << "patatatataaat: " << line << std::endl;
+		//break;
 		//std::cout << "DEBUGAMOS\n";
 		/* if (aux[a - 1] == '\n' && aux[a - 2] == '\t'){//creo q hay q checkear por /t/n
 			std::cout << aux;
@@ -163,5 +201,77 @@ std::vector<struct pollfd>	Server::get_pollfd(){
 	return pollfd;
 }
 
-Server::~Server(){}
+// Add extra utility methods/ getters to aid integration with other components
+// Client management
+Client*				Server::getClientByFd(int fd) {
+	for (std::vector<Client*>::iterator it = client_list.begin(); it != client_list.end(); ++it) {
+		if ((*it)->get_sock_fd() == fd) {
+			return (*it);
+		}
+	}
 
+	return (NULL);
+}
+
+Client*				Server::getClientByNick(const std::string& nick) {
+	for (std::vector<Client*>::iterator it = client_list.begin(); it != client_list.end(); ++it) {
+		if ((*it)->get_nick() == nick) {
+			return (*it);
+		}
+	}
+
+	return (NULL);
+}
+
+void				Server::removeClientByFd(int fd) {
+	for (std::vector<Client*>::iterator it = client_list.begin(); it != client_list.end(); ++it) {
+		if ((*it)->get_sock_fd() == fd) {
+			delete *it;
+			client_list.erase(it);
+			break ;
+		}
+	}
+
+	// Remove from pollfd vector
+	for (std::vector<struct pollfd>::iterator it = pollfd.begin(); it != pollfd.end(); ++it) {
+		if (it->fd == fd) {
+			close(fd);
+			pollfd.erase(it);
+			break ;
+		}
+	}
+}
+
+// Channel management
+Channel*			Server::getChannelByName(const std::string& name) {
+	for (std::vector<Channel*>::iterator it = channel_list.begin(); it != channel_list.end(); ++it) {
+		if ((*it)->getName() == name) {
+			return (*it);
+		}
+	}
+
+	return (NULL);
+}
+
+Channel*			Server::createChannel(const std::string& name) {
+	Channel* channel = new Channel(name);
+
+	channel_list.push_back(channel);
+
+	return (channel);
+}
+
+void				Server::removeChannel(const std::string& name) {
+	for (std::vector<Channel*>::iterator it = channel_list.begin(); it != channel_list.end(); ++it) {
+		if ((*it)->getName() == name && (*it)->getClientCount() == 0) {
+			delete *it;
+			channel_list.erase(it);
+			break ;
+		}
+	}
+}
+
+// Server information access
+const std::string&	Server::getPassword(void) const {
+	return (pass);
+}

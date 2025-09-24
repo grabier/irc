@@ -14,6 +14,9 @@
 # include <netinet/in.h>//pa sockaddr_in
 # include <stdint.h>
 # include "client.hpp"
+# include "channel.hpp"
+# include "command_router.hpp"
+# include "parser.hpp"
 
  class Client;
 
@@ -26,6 +29,12 @@ class Server{
 		std::vector<struct pollfd> pollfd;//tendremos un pollfd para el server
 		//y luego uno por cliente q se conecte
 		std::vector<Client *> client_list;
+
+		// Add extra for channel/ commands integration
+		std::vector<Channel*>	channel_list;
+		Parser					_parser;
+		CommandRouter*			_commandRouter;
+
 	public:
 		Server(int, std::string);
 		int	init_server_socket();
@@ -38,5 +47,20 @@ class Server{
 		std::string	handle_message(int);
 		Client get_client(int);
 		~Server();
+
+		// Add extra utility methods/ getters to aid integration with other components
+		// Client management
+		Client*				getClientByFd(int fd);
+		Client*				getClientByNick(const std::string& nick);
+		void				removeClientByFd(int fd);
+
+		// Channel management
+		Channel*			getChannelByName(const std::string& name);
+		Channel*			createChannel(const std::string& name);
+		void				removeChannel(const std::string& name);
+
+		// Server information access
+		const std::string&	getPassword(void) const;
 };
+
 #endif
