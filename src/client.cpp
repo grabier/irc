@@ -142,5 +142,6 @@ std::string	Client::extractCompleteMessage(void)
 		this->_message_buffer.erase(0, pos + 2);
 		return (result);
 	}
+	//std::cout << "line after trim: " <<_message_buffer << std::endl;
 	return ("");
 }

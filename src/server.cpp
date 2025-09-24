@@ -94,7 +94,7 @@ int  Server::who_is_event(){
 			else
 			{
 				std::cout << "handle a cliento\n";
-				if (handle_message(pollfd[i].fd) == "")
+				if (handle_message(pollfd[i].fd, client_list[i - 1]) == "")
 					pollfd.erase(it + i);
 			}
 		}
@@ -127,12 +127,12 @@ void  Server::add_new_client(){
 	//std::cout << "created a cliento\n";
 }
 
-std::string  Server::handle_message(int fd){
+std::string  Server::handle_message(int fd, Client *client){
 	int a;
 	char	aux[1024];
 	std::string	buff;
 	std::string	line;
-	size_t	pos = 0;
+	//size_t	pos = 0;
 	while (1)
 	{
 		a = recv(fd, aux, sizeof(aux) - 1, 0);//recive los mensajes en aux
@@ -141,18 +141,33 @@ std::string  Server::handle_message(int fd){
 
 			// Instead of exit(1), handle client disconnect gracefully to prevent memory leaks
 			removeClientByFd(fd);
-			return (buff);
+			return ("");
 		}
+
+		std::string	line(aux);
+		client->appendToBuffer(line);
+		line = client->extractCompleteMessage();
+		if (line != "")
+		{
+			Message msg = _parser.parseMessage(line);
+			CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
+			if (result == CommandRouter::CMD_ERROR){
+				//std::cout << "sale x aki\n";
+				//line.erase(0, line.size());
+				return "";
+			}
+			// Handle cmd results
+			if (result == CommandRouter::CMD_DISCONNECT) {
+				removeClientByFd(fd);
+				return (buff);
+			}
+		}
+
 		//es basicamente el read para sockets
-		buff.append(aux);
-		while ((pos = buff.find("\n")) != std::string::npos && buff != ""){
-			std::string line = buff.substr(0, pos);
+	/* 	std::string	line(aux);
+		client->appendToBuffer(line); */
+		/* while ((pos = buff.find("\n")) != std::string::npos && buff != ""){
 
-			// quitar posible \r al final
-			if (!line.empty() && line[line.size() - 1] == '\r')
-				line.resize(line.size() - 1);
-
-			buff.erase(0, pos + 1);
 			std::cout << "line: " << line << std::endl;
 			
 			// Parse and process command
@@ -170,7 +185,7 @@ std::string  Server::handle_message(int fd){
 					return (buff);
 				}
 			}
-		}
+		} */
 		/* while ((pos = buff.find("\r\n"))) {
 			line = buff.substr(0, pos);
 			buff.erase(0, pos + 2); // +2 para quitar \r\n
@@ -183,7 +198,6 @@ std::string  Server::handle_message(int fd){
 			std::cout << aux;
 			break ;
 		} */
-		buff.append(aux);
 	}
 	return (buff);
 }

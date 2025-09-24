@@ -44,7 +44,7 @@ class Server{
 		void	poll_server();
 		int	who_is_event();
 		void	add_new_client();
-		std::string	handle_message(int);
+		std::string	handle_message(int, Client *);
 		Client get_client(int);
 		~Server();
 

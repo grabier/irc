@@ -1,6 +1,6 @@
 NAME = irc
 
-CFLAGS = -Wall -g -Wextra -Werror -std=c++98 -I. #-fsanitize=address
+CFLAGS = -Wall -g -Wextra -Werror -std=c++98 -I. -fsanitize=address
 
 CC = c++
 
