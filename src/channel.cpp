@@ -358,3 +358,8 @@ bool	Channel::canJoin(Client& client, const std::string& key)
 		return (false);
 	return (true);
 }
+
+std::list<Client*>	Channel::getClientList(void) const
+{
+	return (this->_client_list);
+}
