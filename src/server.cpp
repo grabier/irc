@@ -11,6 +11,7 @@ Server::Server(int p, std::string pa){
 	listen(sock, 1024);//habra q meter las q queramos. numero de conexiones en cola
 	poll_server();//inicializamos el pollfd del server
 
+	_parser = Parser();
 	_commandRouter = new CommandRouter(*this);
 }
 
@@ -132,73 +133,30 @@ std::string  Server::handle_message(int fd, Client *client){
 	char	aux[1024];
 	std::string	buff;
 	std::string	line;
-	//size_t	pos = 0;
-	while (1)
-	{
-		a = recv(fd, aux, sizeof(aux) - 1, 0);//recive los mensajes en aux
-		if (a == 0) {
-			std::cout << "cliente finaliza\n";
+	
+	a = recv(fd, aux, sizeof(aux) - 1, 0);//recive los mensajes en aux
+	if (a == 0) {
+		std::cout << "cliente finaliza\n";
+		removeClientByFd(fd);
+		return ("");
+	}
+	if (a < 0) {
+		return ("");
+	}
 
-			// Instead of exit(1), handle client disconnect gracefully to prevent memory leaks
+	std::string received_data(aux, a);
+	client->appendToBuffer(received_data);
+	
+	while (!(line = client->extractCompleteMessage()).empty()) {
+		Message msg = _parser.parseMessage(line);
+		CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
+		
+		if (result == CommandRouter::CMD_DISCONNECT) {
 			removeClientByFd(fd);
 			return ("");
 		}
-
-		std::string	line(aux);
-		client->appendToBuffer(line);
-		line = client->extractCompleteMessage();
-		if (line != "")
-		{
-			Message msg = _parser.parseMessage(line);
-			CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
-			if (result == CommandRouter::CMD_ERROR){
-				//std::cout << "sale x aki\n";
-				//line.erase(0, line.size());
-				return "";
-			}
-			// Handle cmd results
-			if (result == CommandRouter::CMD_DISCONNECT) {
-				removeClientByFd(fd);
-				return (buff);
-			}
-		}
-
-		//es basicamente el read para sockets
-	/* 	std::string	line(aux);
-		client->appendToBuffer(line); */
-		/* while ((pos = buff.find("\n")) != std::string::npos && buff != ""){
-
-			std::cout << "line: " << line << std::endl;
-			
-			// Parse and process command
-			if (!line.empty()) {
-				Message msg = _parser.parseMessage(line);
-				CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
-				if (result == CommandRouter::CMD_ERROR){
-					//std::cout << "sale x aki\n";
-					//line.erase(0, line.size());
-					return "";
-				}
-				// Handle cmd results
-				if (result == CommandRouter::CMD_DISCONNECT) {
-					removeClientByFd(fd);
-					return (buff);
-				}
-			}
-		} */
-		/* while ((pos = buff.find("\r\n"))) {
-			line = buff.substr(0, pos);
-			buff.erase(0, pos + 2); // +2 para quitar \r\n
-			//std::cout << line << std::endl;
-		} */
-		//std::cout << "patatatataaat: " << line << std::endl;
-		//break;
-		//std::cout << "DEBUGAMOS\n";
-		/* if (aux[a - 1] == '\n' && aux[a - 2] == '\t'){//creo q hay q checkear por /t/n
-			std::cout << aux;
-			break ;
-		} */
 	}
+	
 	return (buff);
 }
 

@@ -6,7 +6,7 @@
 /*   By: sstoev <sstoev@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/19 22:57:27 by sstoev           ###   ########.fr       */
+/*   Updated: 2025/09/28 17:55:57 by sstoev           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -57,7 +57,6 @@ CommandRouter::CommandResult	CommandRouter::processCommand(int client_fd, const 
 	// Check authentication requirements
 	if (!client->isAuthenticated() && requiresAuthentication(command)) {
 		sendError(*client, "464", ":Password incorrect");
-		
 		return (CMD_ERROR);
 	}
 
@@ -92,121 +91,480 @@ bool	CommandRouter::requiresAuthentication(const std::string& command) const {
 // ----------------------------- AUTH & REGISTRATION CMD HANDLERS -----------------------------
  
 CommandRouter::CommandResult	CommandRouter::handlePASS(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] PASS handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (client.isRegistered()) {
+		sendError(client, "462", ":You may not reregister");
+		return (CMD_ERROR);
+	}
+
+	if (msg.getParamCount() < 1) {
+		sendError(client, "461", "PASS :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string password = msg.getParamAt(0);
+
+	if (password == _server.getPassword()) {
+		client.set_authenticated_status(true);
+		return (CMD_OK);
+	}
+	else {
+		sendError(client, "464", ":Password incorrect");
+		return (CMD_ERROR);
+	}
 }
 
 CommandRouter::CommandResult	CommandRouter::handleNICK(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] NICK handler called (stub)" << std::endl;
-	
+	if (msg.getParamCount() < 1) {
+		sendError(client, "431", ":No nickname given");
+		return (CMD_ERROR);
+	}
+
+	std::string nickname = msg.getParamAt(0);
+
+	// Validate nickname format
+	if (!validateNickname(nickname)) {
+		sendError(client, "432", nickname + " :Erroneous nickname");
+		return (CMD_ERROR);
+	}
+
+	// Check if nickname is already in use
+	Client* existing_client = _server.getClientByNick(nickname);
+	if (existing_client && existing_client != &client) {
+		sendError(client, "433", nickname + " :Nickname is already in use");
+		return (CMD_ERROR);
+	}
+
+	// Set nickname using existing Client method
+	std::string nick_copy = nickname;
+	client.set_nick(nick_copy);
+
+	// Send welcome message if fully registered
+	if (client.isRegistered()) {
+		sendResponse(client, ":server 001 " + nickname + " :Welcome to the IRC server");
+		sendResponse(client, ":server 002 " + nickname + " :Your host is server");
+		sendResponse(client, ":server 003 " + nickname + " :This server was created today");
+		sendResponse(client, ":server 004 " + nickname + " server 1.0 io tkol");
+	}
+
 	return (CMD_OK);
 }
 
 CommandRouter::CommandResult	CommandRouter::handleUSER(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] USER handler called (stub)" << std::endl;
-	
+	if (client.isRegistered()) {
+		sendError(client, "462", ":You may not reregister");
+		return (CMD_ERROR);
+	}
+
+	if (msg.getParamCount() < 4) {
+		sendError(client, "461", "USER :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string username = msg.getParamAt(0);
+	std::string realname = msg.getParamAt(3);
+
+	// Set user info using existing Client methods
+	std::string user_copy = username;
+	std::string real_copy = realname;
+	client.set_user(user_copy);
+	client.set_real_name(real_copy);
+
+	// Send welcome if fully registered
+	if (client.isRegistered()) {
+		std::string nick = client.get_nick();
+		sendResponse(client, ":server 001 " + nick + " :Welcome to the IRC server");
+		sendResponse(client, ":server 002 " + nick + " :Your host is server");
+		sendResponse(client, ":server 003 " + nick + " :This server was created today");
+		sendResponse(client, ":server 004 " + nick + " server 1.0 io tkol");
+	}
+
 	return (CMD_OK);
 }
-
 
 // ----------------------------- CHANNEL OPERATION HANDLERS -----------------------------
 
 CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] JOIN handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (msg.getParamCount() < 1) {
+		sendError(client, "461", "JOIN :Not enough parameters");
+		return CMD_ERROR;
+	}
+
+	std::string channelName = msg.getParamAt(0);
+	std::string key = (msg.getParamCount() > 1) ? msg.getParamAt(1) : "";
+
+	// Validate channel name
+	if (!validateChannelName(channelName)) {
+		sendError(client, "403", channelName + " :No such channel");
+		return (CMD_ERROR);
+	}
+
+	// Get or create channel
+	Channel* channel = _server.getChannelByName(channelName);
+	if (!channel) {
+		channel = _server.createChannel(channelName);
+		// First user becomes operator
+		channel->addOperator(client);
+	}
+
+	// Use existing Client method (which validates and calls Channel methods)
+	client.addChannel(channel, key);
+
+	// Check if join was successful
+	if (client.isInChannel(channel)) {
+		// Send JOIN confirmation to user
+		sendResponse(client, ":" + client.get_nick() + " JOIN " + channelName);
+		
+		// Send topic if exists
+		if (!channel->getTopic().empty()) {
+			sendResponse(client, ":server 332 " + client.get_nick() + " " + 
+						channelName + " :" + channel->getTopic());
+		}
+		
+		// Send user list
+		std::string userList = formatChannelUserList(*channel);
+		sendResponse(client, ":server 353 " + client.get_nick() + " = " + 
+					channelName + " :" + userList);
+		sendResponse(client, ":server 366 " + client.get_nick() + " " + 
+					channelName + " :End of /NAMES list");
+		
+		// Notify other users in channel
+		channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
+		
+		return (CMD_OK);
+	}
+	else {
+		// Join failed - channel methods already handle the reason
+		sendError(client, "473", channelName + " :Cannot join channel");
+		return CMD_ERROR;
+	}
 }
 
 CommandRouter::CommandResult	CommandRouter::handlePART(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] PART handler called (stub)" << std::endl;
-	
+	if (msg.getParamCount() < 1) {
+		sendError(client, "461", "PART :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string channelName = msg.getParamAt(0);
+	std::string reason = (msg.getParamCount() > 1) ? msg.getParamAt(1) : "";
+
+	Channel* channel = _server.getChannelByName(channelName);
+	if (!channel) {
+		sendError(client, "403", channelName + " :No such channel");
+		return (CMD_ERROR);
+	}
+
+	if (!client.isInChannel(channel)) {
+		sendError(client, "442", channelName + " :You're not on that channel");
+		return (CMD_ERROR);
+	}
+
+	// Notify channel before leaving
+	std::string partMsg = ":" + client.get_nick() + " PART " + channelName;
+	if (!reason.empty()) {
+		partMsg += " :" + reason;
+	}
+	channel->broadcastMessage(partMsg);
+
+	// Use existing Client method to leave channel
+	client.removeChannel(channel);
+
+	// Remove empty channel
+	if (channel->getClientCount() == 0) {
+		_server.removeChannel(channelName);
+	}
+
 	return (CMD_OK);
 }
 
 CommandRouter::CommandResult	CommandRouter::handleTOPIC(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] TOPIC handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (msg.getParamCount() < 1) {
+		sendError(client, "461", "TOPIC :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string channelName = msg.getParamAt(0);
+	Channel* channel = _server.getChannelByName(channelName);
+
+	if (!channel) {
+		sendError(client, "403", channelName + " :No such channel");
+		return (CMD_ERROR);
+	}
+
+	if (!client.isInChannel(channel)) {
+		sendError(client, "442", channelName + " :You're not on that channel");
+		return (CMD_ERROR);
+	}
+
+	if (msg.getParamCount() == 1) {
+		// Query topic
+		if (channel->getTopic().empty()) {
+			sendResponse(client, ":server 331 " + client.get_nick() + " " + channelName + " :No topic is set");
+		}
+		else {
+			sendResponse(client, ":server 332 " + client.get_nick() + " " + channelName + " :" + channel->getTopic());
+		}
+		return (CMD_OK);
+	}
+	else {
+		// Set topic
+		std::string topic = msg.getParamAt(1);
+		std::string topic_copy = topic;
+		
+		if (channel->setTopic(topic_copy, client)) {
+			// Success - broadcast to channel
+			channel->broadcastMessage(":" + client.get_nick() + " TOPIC " + channelName + " :" + topic);
+			return (CMD_OK);
+		} 
+		else {
+			sendError(client, "482", channelName + " :You're not channel operator");
+			return (CMD_ERROR);
+		}
+	}
 }
 
 
 // ----------------------------- CHANNEL MODERATION HANDLERS -----------------------------
 
 CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
+	if (msg.getParamCount() < 1) {
+		sendError(client, "461", "MODE :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string target = msg.getParamAt(0);
 	
-	std::cout << "[CommandRouter] MODE handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (target[0] == '#') {
+		// Channel mode
+		Channel* channel = _server.getChannelByName(target);
+		if (!channel) {
+			sendError(client, "403", target + " :No such channel");
+			return (CMD_ERROR);
+		}
+
+		if (!client.isInChannel(channel)) {
+			sendError(client, "442", target + " :You're not on that channel");
+			return (CMD_ERROR);
+		}
+
+		if (msg.getParamCount() == 1) {
+			// Query channel modes
+			sendResponse(client, ":server 324 " + client.get_nick() + " " + target + " +nt");
+			return (CMD_OK);
+		}
+
+		std::string modeString = msg.getParamAt(1);
+		std::string param = (msg.getParamCount() > 2) ? msg.getParamAt(2) : "";
+		
+		if (modeString.empty()) {
+			return (CMD_ERROR);
+		}
+
+		bool adding = (modeString[0] == '+');
+		if (!adding && modeString[0] != '-') {
+			return (CMD_ERROR);
+		}
+
+		for (std::size_t i = 1; i < modeString.length(); ++i) {
+			char mode = modeString[i];
+			
+			// For modes that affect other users (like 'o'), need target client
+			Client* targetClient = &client;
+			if (mode == 'o' && !param.empty()) {
+				targetClient = _server.getClientByNick(param);
+				if (!targetClient) {
+					sendError(client, "401", param + " :No such nick/channel");
+					continue ;
+				}
+			}
+
+			bool success;
+			if (adding) {
+				success = channel->setMode(mode, param, client, *targetClient);
+			}
+			else {
+				success = channel->removeMode(mode, client, *targetClient);
+			}
+
+			if (success) {
+				// Broadcast mode change
+				std::string modeChange = ":" + client.get_nick() + " MODE " + target + " " + 
+										(adding ? "+" : "-") + mode;
+				if (!param.empty()) {
+					modeChange += " " + param;
+				}
+				channel->broadcastMessage(modeChange);
+			} 
+			else {
+				sendError(client, "482", target + " :You're not channel operator");
+			}
+		}
+		return (CMD_OK);
+	}
+	else {
+		// User mode - not implemented for now
+		sendError(client, "501", "MODE :User modes not implemented");
+		return (CMD_ERROR);
+	}
 }
 
 CommandRouter::CommandResult	CommandRouter::handleKICK(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] KICK handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (msg.getParamCount() < 2) {
+		sendError(client, "461", "KICK :Not enough parameters");
+		return CMD_ERROR;
+	}
+
+	std::string channelName = msg.getParamAt(0);
+	std::string targetNick = msg.getParamAt(1);
+	std::string reason = (msg.getParamCount() > 2) ? msg.getParamAt(2) : client.get_nick();
+
+	Channel* channel = _server.getChannelByName(channelName);
+	if (!channel) {
+		sendError(client, "403", channelName + " :No such channel");
+		return (CMD_ERROR);
+	}
+
+	if (!client.isInChannel(channel)) {
+		sendError(client, "442", channelName + " :You're not on that channel");
+		return (CMD_ERROR);
+	}
+
+	Client* target = _server.getClientByNick(targetNick);
+	if (!target) {
+		sendError(client, "401", targetNick + " :No such nick/channel");
+		return (CMD_ERROR);
+	}
+
+	if (!target->isInChannel(channel)) {
+		sendError(client, "441", targetNick + " " + channelName + " :They aren't on that channel");
+		return (CMD_ERROR);
+	}
+
+	// Use existing Channel method
+	if (channel->kickClient(client, *target)) {
+		// Success - Channel::kickClient already broadcasts
+		// Send KICK message to the kicked user specifically
+		sendResponse(*target, ":" + client.get_nick() + " KICK " + channelName + " " + targetNick + " :" + reason);
+		return (CMD_OK);
+	}
+	else {
+		sendError(client, "482", channelName + " :You're not channel operator");
+		return (CMD_ERROR);
+	}
 }
 
 CommandRouter::CommandResult	CommandRouter::handleINVITE(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] INVITE handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (msg.getParamCount() < 2) {
+		sendError(client, "461", "INVITE :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string targetNick = msg.getParamAt(0);
+	std::string channelName = msg.getParamAt(1);
+
+	Channel* channel = _server.getChannelByName(channelName);
+	if (!channel) {
+		sendError(client, "403", channelName + " :No such channel");
+		return (CMD_ERROR);
+	}
+
+	if (!client.isInChannel(channel)) {
+		sendError(client, "442", channelName + " :You're not on that channel");
+		return (CMD_ERROR);
+	}
+
+	Client* target = _server.getClientByNick(targetNick);
+	if (!target) {
+		sendError(client, "401", targetNick + " :No such nick/channel");
+		return (CMD_ERROR);
+	}
+
+	if (target->isInChannel(channel)) {
+		sendError(client, "443", targetNick + " " + channelName + " :is already on channel");
+		return (CMD_ERROR);
+	}
+
+	// Use existing Channel method
+	if (channel->inviteClient(client, *target)) {
+		// Send INVITE to target user
+		sendResponse(*target, ":" + client.get_nick() + " INVITE " + targetNick + " " + channelName);
+		// Confirm to inviter
+		sendResponse(client, ":server 341 " + client.get_nick() + " " + targetNick + " " + channelName);
+		return (CMD_OK);
+	}
+	else {
+		sendError(client, "482", channelName + " :You're not channel operator");
+		return (CMD_ERROR);
+	}
 }
 
 
 // ----------------------------- CHANNEL MODERATION HANDLERS -----------------------------
 
 CommandRouter::CommandResult	CommandRouter::handlePRIVMSG(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] PRIVMSG handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	if (msg.getParamCount() < 2) {
+		sendError(client, "461", "PRIVMSG :Not enough parameters");
+		return CMD_ERROR;
+	}
+
+	std::string target = msg.getParamAt(0);
+	std::string message = msg.getParamAt(1);
+
+	if (target[0] == '#') {
+		// Channel message
+		Channel* channel = _server.getChannelByName(target);
+		if (!channel) {
+			sendError(client, "403", target + " :No such channel");
+			return CMD_ERROR;
+		}
+
+		if (!client.isInChannel(channel)) {
+			sendError(client, "442", target + " :You're not on that channel");
+			return CMD_ERROR;
+		}
+
+		// Use existing Channel method to broadcast
+		std::string fullMsg = ":" + client.get_nick() + " PRIVMSG " + target + " :" + message;
+		channel->broadcastMessage(fullMsg);
+		return (CMD_OK);
+	}
+	else {
+		// Private message
+		Client* targetClient = _server.getClientByNick(target);
+		if (!targetClient) {
+			sendError(client, "401", target + " :No such nick/channel");
+			return (CMD_ERROR);
+		}
+
+		std::string fullMsg = ":" + client.get_nick() + " PRIVMSG " + target + " :" + message;
+		sendResponse(*targetClient, fullMsg);
+		return (CMD_OK);
+	}
 }
 
 CommandRouter::CommandResult	CommandRouter::handleNOTICE(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] NOTICE handler called (stub)" << std::endl;
-	
+	// NOTICE is like PRIVMSG but should not generate error responses
+	if (msg.getParamCount() < 2) {
+		return (CMD_OK); // Silently ignore
+	}
+
+	std::string target = msg.getParamAt(0);
+	std::string message = msg.getParamAt(1);
+
+	if (target[0] == '#') {
+		Channel* channel = _server.getChannelByName(target);
+		if (channel && client.isInChannel(channel)) {
+			std::string fullMsg = ":" + client.get_nick() + " NOTICE " + target + " :" + message;
+			channel->broadcastMessage(fullMsg);
+		}
+	}
+	else {
+		Client* targetClient = _server.getClientByNick(target);
+		if (targetClient) {
+			std::string fullMsg = ":" + client.get_nick() + " NOTICE " + target + " :" + message;
+			sendResponse(*targetClient, fullMsg);
+		}
+	}
 	return (CMD_OK);
 }
 
@@ -214,33 +572,38 @@ CommandRouter::CommandResult	CommandRouter::handleNOTICE(Client& client, const M
 // ----------------------------- CHANNEL CONNECTION MANAGEMENT HANDLERS -----------------------------
 
 CommandRouter::CommandResult	CommandRouter::handlePING(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] PING handler called (stub)" << std::endl;
-	
+	if (msg.getParamCount() < 1) {
+		sendError(client, "461", "PING :Not enough parameters");
+		return (CMD_ERROR);
+	}
+
+	std::string server = msg.getParamAt(0);
+	sendResponse(client, ":server PONG server :" + server);
 	return (CMD_OK);
 }
 
 CommandRouter::CommandResult	CommandRouter::handlePONG(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
+	// PONG is a response to PING - typically no response needed
+	// Just acknowledge receipt (optional logging for debugging)
 	(void)client; (void)msg;
 	
-	std::cout << "[CommandRouter] PONG handler called (stub)" << std::endl;
-	
+	// PONG responses are usually silent - no server response needed
+	// The client is confirming it's still alive
 	return (CMD_OK);
 }
 
 CommandRouter::CommandResult	CommandRouter::handleQUIT(Client& client, const Message& msg) {
-	// Stub code just so that it compiles
-	// TODO: Provide full implementation
-	(void)client; (void)msg;
-	
-	std::cout << "[CommandRouter] QUIT handler called (stub)" << std::endl;
-	
-	return (CMD_OK);
+	std::string reason = (msg.getParamCount() > 0) ? msg.getParamAt(0) : "Client quit";
+
+	// Notify all channels the client is in
+	std::list<Channel*> channels = client.getChannels();
+	for (std::list<Channel*>::iterator it = channels.begin(); it != channels.end(); ++it) {
+		(*it)->broadcastMessage(":" + client.get_nick() + " QUIT :" + reason);
+		client.removeChannel(*it);
+	}
+
+	// Signal that client should be disconnected
+	return (CMD_DISCONNECT);
 }
 
 
@@ -264,32 +627,61 @@ void			CommandRouter::sendError(Client& client, const std::string& code, const s
 }
 
 bool			CommandRouter::validateChannelName(const std::string& name) const {
-	// TODO: Basic validation only - full implementation when integrated
 	if (name.empty() || name[0] != '#') {
 		return (false);
 	}
 
-	// Arbitrary limit char limit set just to be on the safe side, change if needed; protocol doesn't explicitly specify it
-	if (name.length() > 100) {
-		return (false);
+	// Check for invalid characters
+	for (std::size_t i = 1; i < name.length(); ++i) {
+		char c = name[i];
+		if (c == ' ' || c == ',' || c == '\r' || c == '\n' || c == '\0') {
+			return (false);
+		}
 	}
-
 	return (true);
 }
 
 bool			CommandRouter::validateNickname(const std::string& nick) const {
-	// TODO: Basic validation only - full implementation when integrated
-	// nick size is again set arbitrarily as a safety net
-	if (nick.empty() || nick.length() > 30) {
+	if (nick.empty()) {
 		return (false);
 	}
 
-	return (!nick.empty());
+	// First character must be letter or special char
+	char first = nick[0];
+	if (!std::isalpha(first) && first != '[' && first != ']' && 
+		first != '\\' && first != '`' && first != '_' && 
+		first != '^' && first != '{' && first != '|' && first != '}') {
+		return (false);
+	}
+
+	// Rest can be letters, digits, or special chars
+	for (std::size_t i = 1; i < nick.length(); ++i) {
+		char c = nick[i];
+		if (!std::isalnum(c) && c != '[' && c != ']' && c != '\\' && 
+			c != '`' && c != '_' && c != '^' && c != '{' && c != '|' && 
+			c != '}' && c != '-') {
+			return (false);
+		}
+	}
+	return (true);
 }
 
 std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
-	// Stub implementation - can skip if not deemed necessary
-	(void)channel;
-
-	return ("user_list_placeholder");
+	std::list<Client*> clients = channel.getClientList();
+	std::string userList;
+	
+	for (std::list<Client*>::iterator it = clients.begin(); it != clients.end(); ++it) {
+		if (it != clients.begin()) {
+			userList += " ";
+		}
+		
+		// Add @ prefix for operators
+		if (channel.isOperator(**it)) {
+			userList += "@";
+		}
+		
+		userList += (*it)->get_nick();
+	}
+	
+	return (userList);
 }

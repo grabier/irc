@@ -63,6 +63,7 @@ public:
 	bool		isTopicRestricted( void );
 	bool		broadcastMessage( const std::string message );
 	bool		canJoin( Client& client, const std::string& key );
+	std::list<Client*>	getClientList( void ) const;
 
 };
 
