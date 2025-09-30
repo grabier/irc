@@ -199,6 +199,14 @@ Client*				Server::getClientByNick(const std::string& nick) {
 }
 
 void				Server::removeClientByFd(int fd) {
+	Client *client = getClientByFd(fd);
+	std::list<Channel*> channel_list = client->getChannels();
+	for (std::list<Channel*>::iterator it = channel_list.begin(); it != channel_list.end(); it++)
+	{
+		Channel *channel = *it;
+		channel->removeClient(*client);
+	}
+	
 	for (std::vector<Client*>::iterator it = client_list.begin(); it != client_list.end(); ++it) {
 		if ((*it)->get_sock_fd() == fd) {
 			delete *it;
