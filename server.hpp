@@ -45,6 +45,7 @@ class Server{
 		int	who_is_event();
 		void	add_new_client();
 		std::string	handle_message(int, Client *);
+		void	handlePassCommand(Client *, const std::string&);
 		Client get_client(int);
 		~Server();
 

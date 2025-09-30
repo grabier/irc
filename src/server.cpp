@@ -95,8 +95,15 @@ int  Server::who_is_event(){
 			else
 			{
 				std::cout << "handle a cliento\n";
-				if (handle_message(pollfd[i].fd, client_list[i - 1]) == "")
-					pollfd.erase(it + i);
+				if (handle_message(pollfd[i].fd, getClientByFd(pollfd[i].fd)) == "")
+				{
+					//std::cout << "problemas: " << i << std::endl;
+					//it = pollfd.begin() + i - 1;
+					//pollfd.erase(it);
+					for (unsigned int i = 0; i < client_list.size(); i++){
+						std::cout << "client " << i << ": " << client_list[i]->get_nick() << std::endl;
+					}
+				}
 			}
 		}
 		//buscar por revents = 0 else
@@ -115,7 +122,6 @@ void  Server::add_new_client(){
 	if (sockfd < 0)
 		exit(21);
 	fcntl(sockfd, F_SETFL, O_NONBLOCK);
-	//aqui creariamos el cliente y añadirlo a la lista
 	struct pollfd pfd;//creamos el pollfd del cliente y lo añadimos a la lista
 	pfd.fd = sockfd;
 	pfd.events = POLLIN;
@@ -146,18 +152,15 @@ std::string  Server::handle_message(int fd, Client *client){
 
 	std::string received_data(aux, a);
 	client->appendToBuffer(received_data);
-	
 	while (!(line = client->extractCompleteMessage()).empty()) {
 		Message msg = _parser.parseMessage(line);
 		CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
-		
 		if (result == CommandRouter::CMD_DISCONNECT) {
 			removeClientByFd(fd);
 			return ("");
 		}
 	}
-	
-	return (buff);
+	return ("a");
 }
 
 /* Client Server::get_client(int fd){

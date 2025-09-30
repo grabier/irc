@@ -60,12 +60,7 @@ void	Client::set_register_status(bool status)
 bool	Client::isAuthenticated(void) const 
 {
 	// Must be set to true in server when handling password
-	/* void Server::handlePassCommand(Client* client, const std::string& password)
-	{
-		if (password == this->_server_password)  // Server stores the password
-    	{
-        	client->set_authenticated(true);  // Mark client as authenticated
-    }*/
+	//void Server::handlePassCommand(Client* client, const std::string& password)
 	return (this->_isAuthenticated);
 }
 
@@ -136,6 +131,8 @@ void	Client::appendToBuffer(const std::string& data)
 std::string	Client::extractCompleteMessage(void)
 {
 	size_t pos = this->_message_buffer.find("\r\n");
+	if (pos == std::string::npos)
+		pos = this->_message_buffer.find("\n");
 	if (pos != std::string::npos)
 	{
 		std::string result = this->_message_buffer.substr(0, pos);

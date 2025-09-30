@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   command_router.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sstoev <sstoev@student.42.fr>              +#+  +:+       +#+        */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/28 17:55:57 by sstoev           ###   ########.fr       */
+/*   Updated: 2025/09/30 14:13:07 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,6 +26,7 @@ CommandRouter::~CommandRouter(void) { }
 
 void	CommandRouter::initCommandHandlers(void) {
 	_commandHandlers["PASS"] = &CommandRouter::handlePASS;
+	_commandHandlers["CAP"] = &CommandRouter::handleCAP;
 	_commandHandlers["NICK"] = &CommandRouter::handleNICK;
 	_commandHandlers["USER"] = &CommandRouter::handleUSER;
 	_commandHandlers["JOIN"] = &CommandRouter::handleJOIN;
@@ -53,11 +54,15 @@ CommandRouter::CommandResult	CommandRouter::processCommand(int client_fd, const 
 	}
 
 	std::string command = msg.getCommand();
+	std::cout << "command : " <<  command << std::endl;
+	if (command == "CAP")
+		return (handleCAP(*client, msg));
+		
 
 	// Check authentication requirements
 	if (!client->isAuthenticated() && requiresAuthentication(command)) {
 		sendError(*client, "464", ":Password incorrect");
-		return (CMD_ERROR);
+		return (std::cout << "!auth\n", CMD_ERROR);
 	}
 
 	// Check registration requirements
@@ -90,6 +95,14 @@ bool	CommandRouter::requiresAuthentication(const std::string& command) const {
 
 // ----------------------------- AUTH & REGISTRATION CMD HANDLERS -----------------------------
  
+CommandRouter::CommandResult	CommandRouter::handleCAP(Client& client, const Message& msg){
+	(void)msg;
+	std::string reply = ": myserver CAP * LS :\r\n";
+	send(client.get_sock_fd(), reply.c_str(), reply.size(), 0);
+	return (CMD_OK);
+}
+
+
 CommandRouter::CommandResult	CommandRouter::handlePASS(Client& client, const Message& msg) {
 	if (client.isRegistered()) {
 		sendError(client, "462", ":You may not reregister");
@@ -109,7 +122,7 @@ CommandRouter::CommandResult	CommandRouter::handlePASS(Client& client, const Mes
 	}
 	else {
 		sendError(client, "464", ":Password incorrect");
-		return (CMD_ERROR);
+		return (std::cout << "!wrong pass\n",CMD_ERROR);
 	}
 }
 

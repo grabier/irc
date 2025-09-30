@@ -3,16 +3,17 @@
 /*                                                        :::      ::::::::   */
 /*   parser.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sstoev <sstoev@student.42.fr>              +#+  +:+       +#+        */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/18 23:35:34 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/19 00:20:04 by sstoev           ###   ########.fr       */
+/*   Updated: 2025/09/29 17:02:06 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "parser.hpp"
 #include <cctype>
 #include <sstream>
+#include <iostream>
 
 Parser::Parser(void) { }
 
@@ -23,7 +24,7 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 	std::string	prefix;
 	std::string	command;
 	std::vector<std::string>	params;
-
+	//std::cout << "line: " << rawMessage << std::endl;
 	// Remove trailing CR+LF if present
 	std::string message = rawMessage;
 	if (message.size() >= 2 &&
@@ -31,7 +32,7 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 		message[message.size() - 1] == '\n') {
 			message = message.substr(0, message.size() - 2);
 	}
-
+	//std::cout << "line: " << message << std::endl;
 	// Handle empty message
 	if (message.empty()) {
 		return (Message("", "", std::vector<std::string>()));
@@ -82,13 +83,13 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 			}
 		}
 	}
-
+	//std::cout << "params: " << params[0] << std::endl;
 	// Convert command to uppercase (IRC commands are case-insensitive)
 	std::string uppercaseCommand = command;
 	for (std::size_t i = 0; i < uppercaseCommand.size(); i++) {
 		uppercaseCommand[i] = std::toupper(static_cast<unsigned char>(uppercaseCommand[i]));
 	}
-	
+	//std::cout << "command: " << uppercaseCommand << std::endl;
 	return (Message(prefix, uppercaseCommand, params));
 }
 
@@ -100,7 +101,7 @@ bool	Parser::isValidCommand(const std::string& command) const {
 	static const char* validCommands[] = {
 		"PASS", "NICK", "USER", "JOIN", "PART", "PRIVMSG",
 		"NOTICE", "KICK", "INVITE", "TOPIC", "MODE", "QUIT",
-		"PING", "PONG", NULL};
+		"PING", "PONG", "CAP", NULL};
 	
 	for (int i = 0; validCommands[i] != NULL; i++) {
 		if (command == validCommands[i]) {
