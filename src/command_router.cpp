@@ -6,7 +6,7 @@
 /*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/30 14:13:07 by gmontoro         ###   ########.fr       */
+/*   Updated: 2025/09/30 18:08:11 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -216,7 +216,10 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 	if (!channel) {
 		channel = _server.createChannel(channelName);
 		// First user becomes operator
-		channel->addOperator(client);
+		std::cout << "añadimos a " << client.get_nick() << " de operator\n";
+		channel->addClient(client, key);
+		if (channel->addOperator(client))
+			std::cout << "PACOOOOOO\n";
 	}
 
 	// Use existing Client method (which validates and calls Channel methods)
@@ -224,8 +227,9 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 
 	// Check if join was successful
 	if (client.isInChannel(channel)) {
+		std::string test = ":" + client.get_nick() + "!" + client.get_user() + "@" + "localhost";
 		// Send JOIN confirmation to user
-		sendResponse(client, ":" + client.get_nick() + " JOIN " + channelName);
+		sendResponse(client, test + " JOIN " + channelName);
 		
 		// Send topic if exists
 		if (!channel->getTopic().empty()) {
@@ -235,14 +239,18 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 		
 		// Send user list
 		std::string userList = formatChannelUserList(*channel);
-		sendResponse(client, ":server 353 " + client.get_nick() + " = " + 
+		std::cout << "userlist: "<< userList << std::endl;
+		
+		sendResponse(client, test +  " 353 " + client.get_nick() + " = " + 
 					channelName + " :" + userList);
-		sendResponse(client, ":server 366 " + client.get_nick() + " " + 
-					channelName + " :End of /NAMES list");
+		sendResponse(client, test + " 366 " + client.get_nick() + " " + 
+					channelName + " :End of /NAMES list.");
 		
 		// Notify other users in channel
-		channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
-		
+		//hola soy jorge cuidado con esta funcion de aqui abajo, por eso os esta jodiendo
+		// apañarosla aqui abajo buenas tardes 
+		if (channel->getClientList().size() != 1 && channel->getClientList().size() > 0)
+			channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
 		return (CMD_OK);
 	}
 	else {
@@ -690,6 +698,7 @@ std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
 		
 		// Add @ prefix for operators
 		if (channel.isOperator(**it)) {
+			std::cout << "hola susprimos\n";
 			userList += "@";
 		}
 		

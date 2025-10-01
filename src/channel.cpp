@@ -69,6 +69,10 @@ bool	Channel::removeClient(const Client& client)
 	{
 		if (&client == *it)
 		{
+			if (isOperator(client))
+				removeOperator(client);
+			if (isInvitedClient(client))
+				removeInvitedClient(client);
 			this->_client_list.erase(it);
 			return (true);
 		}
@@ -202,7 +206,7 @@ bool	Channel::inviteClient(Client&inviter, Client& client)
 bool	Channel::setMode(char mode, std::string param, Client& requester, Client& target)
 {
 	if (!isOperator(requester))
-		return (false);
+		return (std::cout << "cliente no es operator\n", false);
 	if (mode == 'i')
 	{
 		(void)param;
@@ -340,6 +344,7 @@ bool	Channel::broadcastMessage(const std::string message)
 		if (bytes_sent == -1)
 		{
 			// Log error or handle disconnected client
+			std::cout << "bytes_sent == -1\n";
 			continue;
 		}
 	}
