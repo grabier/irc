@@ -6,7 +6,7 @@
 /*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/30 18:08:11 by gmontoro         ###   ########.fr       */
+/*   Updated: 2025/10/03 17:07:02 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,10 +25,10 @@ CommandRouter::CommandRouter(Server& server) : _server(server) {
 CommandRouter::~CommandRouter(void) { }
 
 void	CommandRouter::initCommandHandlers(void) {
-	_commandHandlers["PASS"] = &CommandRouter::handlePASS;
+	_commandHandlers["PASS"] = &CommandRouter::handlePASS;//ok
 	_commandHandlers["CAP"] = &CommandRouter::handleCAP;
-	_commandHandlers["NICK"] = &CommandRouter::handleNICK;
-	_commandHandlers["USER"] = &CommandRouter::handleUSER;
+	_commandHandlers["NICK"] = &CommandRouter::handleNICK;//ok
+	_commandHandlers["USER"] = &CommandRouter::handleUSER;//ok
 	_commandHandlers["JOIN"] = &CommandRouter::handleJOIN;
 	_commandHandlers["PART"] = &CommandRouter::handlePART;
 	_commandHandlers["PRIVMSG"] = &CommandRouter::handlePRIVMSG;
@@ -216,10 +216,9 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 	if (!channel) {
 		channel = _server.createChannel(channelName);
 		// First user becomes operator
-		std::cout << "añadimos a " << client.get_nick() << " de operator\n";
+		//std::cout << "añadimos a " << client.get_nick() << " de operator\n";
 		channel->addClient(client, key);
-		if (channel->addOperator(client))
-			std::cout << "PACOOOOOO\n";
+		channel->addOperator(client);
 	}
 
 	// Use existing Client method (which validates and calls Channel methods)
@@ -239,7 +238,7 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 		
 		// Send user list
 		std::string userList = formatChannelUserList(*channel);
-		std::cout << "userlist: "<< userList << std::endl;
+		//std::cout << "userlist: "<< userList << std::endl;
 		
 		sendResponse(client, test +  " 353 " + client.get_nick() + " = " + 
 					channelName + " :" + userList);
@@ -698,7 +697,6 @@ std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
 		
 		// Add @ prefix for operators
 		if (channel.isOperator(**it)) {
-			std::cout << "hola susprimos\n";
 			userList += "@";
 		}
 		
