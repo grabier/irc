@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/10/06 16:09:39 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/06 16:41:31 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -417,7 +417,12 @@ CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Mes
 				channel->broadcastMessage(modeChange);
 			} 
 			else {
-				sendError(client, "482", target + " :You're not channel operator");
+				if (!channel->isOperator(client))
+					sendError(client, "482", target + " :You're not channel operator");
+				else if (!targetClient->isInChannel(channel))
+					sendError(client, "441", client.get_nick() + " " + targetClient->get_nick()
+						+ channel->getName() + " :They're not in channel");
+				return (CMD_ERROR);
 			}
 		}
 		return (CMD_OK);

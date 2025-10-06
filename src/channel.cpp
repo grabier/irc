@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:08:29 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/06 16:11:55 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/06 16:45:28 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -256,7 +256,8 @@ bool	Channel::setMode(char mode, std::string param, Client& requester, Client& t
 	if (mode == 'o')
 	{
 		(void)param;
-		addOperator(target);
+		if (!addOperator(target))
+			return (false);
 		return (true);
 	}
 	if (mode == 'l')
