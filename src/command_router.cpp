@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/10/06 15:21:30 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/06 16:09:39 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -516,7 +516,6 @@ CommandRouter::CommandResult	CommandRouter::handleINVITE(Client& client, const M
 		sendResponse(*target, ":" + client.get_nick() + " INVITE " + targetNick + " " + channelName);
 		target->addChannel(channel, "");
 		channel->addClient(*target, "");
-		channel->addInvitedClient(*target);
 		// Confirm to inviter
 		sendResponse(client, ":server 341 " + client.get_nick() + " " + targetNick + " " + channelName);
 		return (CMD_OK);

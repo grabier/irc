@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:08:29 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/06 13:08:30 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/06 16:11:55 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -111,6 +111,11 @@ size_t	Channel::getClientCount(void) const
 	return (this->_client_list.size());
 }
 
+size_t	Channel::getOperatorCount(void) const
+{
+	return (this->_operators.size());
+}
+
 bool	Channel::addOperator(Client& client)
 {
 	if (hasClient(client))
@@ -142,18 +147,9 @@ bool	Channel::removeOperator(const Client& client)
 	return (false);
 }
 
-bool	Channel::addInvitedClient(Client& client)
+void	Channel::addInvitedClient(Client& client)
 {
-	for (std::list<Client*>::iterator it = this->_invited_clients.begin();
-		it != this->_invited_clients.end(); it++)
-	{
-		if (&client == *it)
-		{
-			this->_invited_clients.push_back(*it);
-			return (true);
-		}
-	}
-	return (false);
+	this->_invited_clients.push_back(&client);
 }
 
 bool	Channel::removeInvitedClient(const Client& client)
@@ -225,7 +221,7 @@ bool	Channel::inviteClient(Client&inviter, Client& client)
 		return (false);
 	if (isInvitedClient(client))
 		return (false);
-	this->_invited_clients.push_back(&client);
+	this->addInvitedClient(client);
 	return (true);
 }
 

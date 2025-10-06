@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:09:27 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/06 13:09:28 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/06 16:00:09 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -59,9 +59,10 @@ public:
 	bool		hasClient( const Client& client );
 	std::string	getName( void ) const;
 	size_t		getClientCount( void ) const;
+	size_t		getOperatorCount( void ) const;
 	bool		addOperator( Client& client );
 	bool		removeOperator( const Client& client );
-	bool		addInvitedClient( Client& client );
+	void		addInvitedClient( Client& client );
 	bool		removeInvitedClient( const Client& client );
 	bool		isOperator( const Client& client );
 	bool		isInvitedClient( const Client& client );
