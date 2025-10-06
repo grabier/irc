@@ -1,21 +1,21 @@
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
-# include <iostream>
-# include <string.h>
+# include <string>
 # include <fcntl.h>
 # include <sys/socket.h>
 # include <unistd.h>
 # include <stdlib.h>
 # include <cstdio>
 # include <poll.h>
-# include <list>
 # include <vector>
 # include <netinet/in.h>//pa sockaddr_in
 # include <stdint.h>
-# include "client.hpp"
-# include "channel.hpp"
-# include "command_router.hpp"
+// Forward declarations to avoid heavy includes where possible
+class Client;
+class Channel;
+class CommandRouter;
+// Parser is stored by value, needs full definition
 # include "parser.hpp"
 
  class Client;
