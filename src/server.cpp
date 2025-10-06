@@ -1,5 +1,10 @@
 #include "../server.hpp"
- #include "../client.hpp"
+#include "../client.hpp"
+#include "../command_router.hpp"
+#include "../channel.hpp"
+
+// remove later if not needed, kept for debugging
+#include <cerrno>
 
 Server::Server(int p, std::string pa){
 	port = p;
@@ -79,35 +84,47 @@ int	Server::monitor_poll(){
 }
 
 int  Server::who_is_event(){
-	unsigned int	i = 0;
-	//std::cout << "DEBUGAMOS\n";
-	std::vector<struct pollfd>::iterator it;
-	it = pollfd.begin();
-	while(i < pollfd.size()){//recorremos todos los eventos
-		if (pollfd[i].revents > 0){
-			if (pollfd[i].fd == sock){
-				//checkeamos el fd asociado al server
-				//si el evento es en el server->alguien intenta conectarr
-				//alguien ha puesto bien el puerto y la ip
-				std::cout << "created a cliento\n";
-				add_new_client();
-			}
-			else
-			{
-				std::cout << "handle a cliento\n";
-				if (handle_message(pollfd[i].fd, getClientByFd(pollfd[i].fd)) == "")
-				{
-					//std::cout << "problemas: " << i << std::endl;
-					//it = pollfd.begin() + i - 1;
-					//pollfd.erase(it);
-					for (unsigned int i = 0; i < client_list.size(); i++){
-						std::cout << "client " << i << ": " << client_list[i]->get_nick() << std::endl;
-					}
-				}
-			}
+	std::size_t i = 0;
+	while (i < pollfd.size()){
+		struct pollfd &pfd = pollfd[i];
+		if (pfd.revents == 0){
+			++i;
+			continue;
 		}
-		//buscar por revents = 0 else
-		i++;
+
+		std::cout << "[who_is_event] i=" << i << " fdsz=" << pollfd.size() << " cls=" << client_list.size() << " fd=" << pfd.fd << " revents=" << pfd.revents << "\n";
+
+		if (pfd.fd == sock && (pfd.revents & POLLIN)){
+			std::cout << "created a cliento\n";
+			add_new_client();
+			++i;
+			continue;
+		}
+
+		int fd = pfd.fd;
+
+		if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)){
+			std::cout << "[who_is_event] removing fd due to error/hup/nval: " << fd << "\n";
+			removeClientByFd(fd);
+			continue;
+		}
+
+		Client *client = getClientByFd(fd);
+		if (!client){
+			std::cout << "[who_is_event] no Client* for fd, removing fd=" << fd << "\n";
+			removeClientByFd(fd);
+			continue;
+		}
+
+		std::cout << "handle a cliento\n";
+		std::string res = handle_message(fd, client);
+		if (res.empty()){
+			std::cout << "[who_is_event] handle_message signalled close, removing fd=" << fd << "\n";
+			removeClientByFd(fd);
+			continue;
+		}
+
+		++i;
 	}
 	return (0);
 }
@@ -122,6 +139,7 @@ void  Server::add_new_client(){
 	if (sockfd < 0)
 		exit(21);
 	fcntl(sockfd, F_SETFL, O_NONBLOCK);
+	//aqui creariamos el cliente y añadirlo a la lista
 	struct pollfd pfd;//creamos el pollfd del cliente y lo añadimos a la lista
 	pfd.fd = sockfd;
 	pfd.events = POLLIN;
@@ -139,28 +157,36 @@ std::string  Server::handle_message(int fd, Client *client){
 	char	aux[1024];
 	std::string	buff;
 	std::string	line;
-	
+
 	a = recv(fd, aux, sizeof(aux) - 1, 0);//recive los mensajes en aux
 	if (a == 0) {
 		std::cout << "cliente finaliza\n";
-		removeClientByFd(fd);
+		// signal close to caller; centralized removal in who_is_event
 		return ("");
 	}
 	if (a < 0) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK){
+			std::cout << "[handle_message] EAGAIN/EWOULDBLOCK on fd=" << fd << "\n";
+			return ("EAGAIN");
+		}
+		std::cout << "[handle_message] recv error on fd=" << fd << " errno=" << errno << "\n";
 		return ("");
 	}
 
 	std::string received_data(aux, a);
 	client->appendToBuffer(received_data);
+
 	while (!(line = client->extractCompleteMessage()).empty()) {
 		Message msg = _parser.parseMessage(line);
 		CommandRouter::CommandResult result = _commandRouter->processCommand(fd, msg);
+
 		if (result == CommandRouter::CMD_DISCONNECT) {
-			removeClientByFd(fd);
+			// signal close to caller; centralized removal in who_is_event
 			return ("");
 		}
 	}
-	return ("a");
+
+	return (buff.empty() ? std::string("OK") : buff);
 }
 
 /* Client Server::get_client(int fd){
@@ -199,14 +225,6 @@ Client*				Server::getClientByNick(const std::string& nick) {
 }
 
 void				Server::removeClientByFd(int fd) {
-	Client *client = getClientByFd(fd);
-	std::list<Channel*> channel_list = client->getChannels();
-	for (std::list<Channel*>::iterator it = channel_list.begin(); it != channel_list.end(); it++)
-	{
-		Channel *channel = *it;
-		channel->removeClient(*client);
-	}
-	
 	for (std::vector<Client*>::iterator it = client_list.begin(); it != client_list.end(); ++it) {
 		if ((*it)->get_sock_fd() == fd) {
 			delete *it;
