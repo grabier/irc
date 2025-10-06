@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   command_router.hpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sstoev <sstoev@student.42.fr>              +#+  +:+       +#+        */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 12:55:53 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/19 14:17:27 by sstoev           ###   ########.fr       */
+/*   Updated: 2025/09/29 16:26:16 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -73,6 +73,7 @@ class	CommandRouter {
 		CommandResult	handlePING(Client& client, const Message& msg);
 		CommandResult	handlePONG(Client& client, const Message& msg);
 		CommandResult	handleQUIT(Client& client, const Message& msg);
+		CommandResult	handleCAP(Client& client, const Message& msg);
 		
 		// Public utils
 		void			sendResponse(Client& client, const std::string& response);

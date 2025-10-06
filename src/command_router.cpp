@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   command_router.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: sstoev <sstoev@student.42.fr>              +#+  +:+       +#+        */
+/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/28 17:55:57 by sstoev           ###   ########.fr       */
+/*   Updated: 2025/10/06 15:21:30 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,9 +25,10 @@ CommandRouter::CommandRouter(Server& server) : _server(server) {
 CommandRouter::~CommandRouter(void) { }
 
 void	CommandRouter::initCommandHandlers(void) {
-	_commandHandlers["PASS"] = &CommandRouter::handlePASS;
-	_commandHandlers["NICK"] = &CommandRouter::handleNICK;
-	_commandHandlers["USER"] = &CommandRouter::handleUSER;
+	_commandHandlers["PASS"] = &CommandRouter::handlePASS;//ok
+	_commandHandlers["CAP"] = &CommandRouter::handleCAP;
+	_commandHandlers["NICK"] = &CommandRouter::handleNICK;//ok
+	_commandHandlers["USER"] = &CommandRouter::handleUSER;//ok
 	_commandHandlers["JOIN"] = &CommandRouter::handleJOIN;
 	_commandHandlers["PART"] = &CommandRouter::handlePART;
 	_commandHandlers["PRIVMSG"] = &CommandRouter::handlePRIVMSG;
@@ -53,11 +54,15 @@ CommandRouter::CommandResult	CommandRouter::processCommand(int client_fd, const 
 	}
 
 	std::string command = msg.getCommand();
+	std::cout << "command : " <<  command << std::endl;
+	if (command == "CAP")
+		return (handleCAP(*client, msg));
+		
 
 	// Check authentication requirements
 	if (!client->isAuthenticated() && requiresAuthentication(command)) {
 		sendError(*client, "464", ":Password incorrect");
-		return (CMD_ERROR);
+		return (std::cout << "!auth\n", CMD_ERROR);
 	}
 
 	// Check registration requirements
@@ -90,6 +95,14 @@ bool	CommandRouter::requiresAuthentication(const std::string& command) const {
 
 // ----------------------------- AUTH & REGISTRATION CMD HANDLERS -----------------------------
  
+CommandRouter::CommandResult	CommandRouter::handleCAP(Client& client, const Message& msg){
+	(void)msg;
+	std::string reply = ": myserver CAP * LS :\r\n";
+	send(client.get_sock_fd(), reply.c_str(), reply.size(), 0);
+	return (CMD_OK);
+}
+
+
 CommandRouter::CommandResult	CommandRouter::handlePASS(Client& client, const Message& msg) {
 	if (client.isRegistered()) {
 		sendError(client, "462", ":You may not reregister");
@@ -109,7 +122,7 @@ CommandRouter::CommandResult	CommandRouter::handlePASS(Client& client, const Mes
 	}
 	else {
 		sendError(client, "464", ":Password incorrect");
-		return (CMD_ERROR);
+		return (std::cout << "!wrong pass\n",CMD_ERROR);
 	}
 }
 
@@ -203,6 +216,8 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 	if (!channel) {
 		channel = _server.createChannel(channelName);
 		// First user becomes operator
+		//std::cout << "añadimos a " << client.get_nick() << " de operator\n";
+		channel->addClient(client, key);
 		channel->addOperator(client);
 	}
 
@@ -211,8 +226,9 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 
 	// Check if join was successful
 	if (client.isInChannel(channel)) {
+		std::string test = ":" + client.get_nick() + "!" + client.get_user() + "@" + "localhost";
 		// Send JOIN confirmation to user
-		sendResponse(client, ":" + client.get_nick() + " JOIN " + channelName);
+		sendResponse(client, test + " JOIN " + channelName);
 		
 		// Send topic if exists
 		if (!channel->getTopic().empty()) {
@@ -222,19 +238,24 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 		
 		// Send user list
 		std::string userList = formatChannelUserList(*channel);
-		sendResponse(client, ":server 353 " + client.get_nick() + " = " + 
+		//std::cout << "userlist: "<< userList << std::endl;
+		
+		sendResponse(client, test +  " 353 " + client.get_nick() + " = " + 
 					channelName + " :" + userList);
-		sendResponse(client, ":server 366 " + client.get_nick() + " " + 
-					channelName + " :End of /NAMES list");
+		sendResponse(client, test + " 366 " + client.get_nick() + " " + 
+					channelName + " :End of /NAMES list.");
 		
 		// Notify other users in channel
-		channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
-		
+		if (channel->getClientList().size() != 1 && channel->getClientList().size() > 0)
+			channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
 		return (CMD_OK);
 	}
 	else {
 		// Join failed - channel methods already handle the reason
-		sendError(client, "473", channelName + " :Cannot join channel");
+		if (channel->isFull())
+			sendError(client, "471", client.get_nick() + " " + channelName + ":Cannot join channel (+l)");
+		else
+			sendError(client, "473", channelName + " :Cannot join channel");
 		return CMD_ERROR;
 	}
 }
@@ -328,8 +349,8 @@ CommandRouter::CommandResult	CommandRouter::handleTOPIC(Client& client, const Me
 
 CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Message& msg) {
 	if (msg.getParamCount() < 1) {
-		sendError(client, "461", "MODE :Not enough parameters");
-		return (CMD_ERROR);
+		sendResponse(client, "221 " + client.get_nick() + " +r");
+		return (CMD_OK);
 	}
 
 	std::string target = msg.getParamAt(0);
@@ -484,10 +505,18 @@ CommandRouter::CommandResult	CommandRouter::handleINVITE(Client& client, const M
 		return (CMD_ERROR);
 	}
 
+	if (channel->isFull()) {
+		sendError(client, "471", targetNick + " " + channelName + ":Cannot join channel (+l)");
+		return (CMD_ERROR);
+	}
+
 	// Use existing Channel method
 	if (channel->inviteClient(client, *target)) {
 		// Send INVITE to target user
 		sendResponse(*target, ":" + client.get_nick() + " INVITE " + targetNick + " " + channelName);
+		target->addChannel(channel, "");
+		channel->addClient(*target, "");
+		channel->addInvitedClient(*target);
 		// Confirm to inviter
 		sendResponse(client, ":server 341 " + client.get_nick() + " " + targetNick + " " + channelName);
 		return (CMD_OK);

@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   channel.cpp                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/10/06 13:08:29 by ppeckham          #+#    #+#             */
+/*   Updated: 2025/10/06 13:08:30 by ppeckham         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include "channel.hpp"
 # include "client.hpp"
 
@@ -69,6 +81,10 @@ bool	Channel::removeClient(const Client& client)
 	{
 		if (&client == *it)
 		{
+			if (isOperator(client))
+				removeOperator(client);
+			if (isInvitedClient(client))
+				removeInvitedClient(client);
 			this->_client_list.erase(it);
 			return (true);
 		}
@@ -120,6 +136,20 @@ bool	Channel::removeOperator(const Client& client)
 		if (&client == *it)
 		{
 			this->_operators.erase(it);
+			return (true);
+		}
+	}
+	return (false);
+}
+
+bool	Channel::addInvitedClient(Client& client)
+{
+	for (std::list<Client*>::iterator it = this->_invited_clients.begin();
+		it != this->_invited_clients.end(); it++)
+	{
+		if (&client == *it)
+		{
+			this->_invited_clients.push_back(*it);
 			return (true);
 		}
 	}
@@ -202,7 +232,7 @@ bool	Channel::inviteClient(Client&inviter, Client& client)
 bool	Channel::setMode(char mode, std::string param, Client& requester, Client& target)
 {
 	if (!isOperator(requester))
-		return (false);
+		return (std::cout << "cliente no es operator\n", false);
 	if (mode == 'i')
 	{
 		(void)param;
@@ -315,6 +345,13 @@ bool	Channel::isTopicRestricted(void)
 	return (false);
 }
 
+bool	Channel::isFull(void)
+{
+	if (this->_has_client_limit && this->_client_limit <= this->_client_list.size())
+		return (true);
+	return (false);
+}
+
 bool	Channel::broadcastMessage(const std::string message)
 {
 	if (_client_list.empty())
@@ -340,6 +377,7 @@ bool	Channel::broadcastMessage(const std::string message)
 		if (bytes_sent == -1)
 		{
 			// Log error or handle disconnected client
+			std::cout << "bytes_sent == -1\n";
 			continue;
 		}
 	}
@@ -352,7 +390,7 @@ bool	Channel::canJoin(Client& client, const std::string& key)
 		return (false);
 	if (this->_invite_only && !isInvitedClient(client))
 		return (false);
-	if (this->_has_client_limit && this->_client_limit <= this->_client_list.size())
+	if (isFull())
 		return (false);
 	if (!validateKey(key))
 		return (false);
