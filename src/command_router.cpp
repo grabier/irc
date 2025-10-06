@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   command_router.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
+/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/10/03 17:07:02 by gmontoro         ###   ########.fr       */
+/*   Updated: 2025/10/06 15:18:40 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -246,15 +246,16 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 					channelName + " :End of /NAMES list.");
 		
 		// Notify other users in channel
-		//hola soy jorge cuidado con esta funcion de aqui abajo, por eso os esta jodiendo
-		// apañarosla aqui abajo buenas tardes 
 		if (channel->getClientList().size() != 1 && channel->getClientList().size() > 0)
 			channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
 		return (CMD_OK);
 	}
 	else {
 		// Join failed - channel methods already handle the reason
-		sendError(client, "473", channelName + " :Cannot join channel");
+		if (channel->isFull())
+			sendError(client, "471", client.get_nick() + " " + channelName + ":Cannot join channel (+l)");
+		else
+			sendError(client, "473", channelName + " :Cannot join channel");
 		return CMD_ERROR;
 	}
 }
@@ -348,8 +349,8 @@ CommandRouter::CommandResult	CommandRouter::handleTOPIC(Client& client, const Me
 
 CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Message& msg) {
 	if (msg.getParamCount() < 1) {
-		sendError(client, "461", "MODE :Not enough parameters");
-		return (CMD_ERROR);
+		sendResponse(client, "221 " + client.get_nick() + " +r");
+		return (CMD_OK);
 	}
 
 	std::string target = msg.getParamAt(0);
@@ -504,10 +505,18 @@ CommandRouter::CommandResult	CommandRouter::handleINVITE(Client& client, const M
 		return (CMD_ERROR);
 	}
 
+	if (channel->isFull()) {
+		sendError(client, "471", targetNick + " " + channelName + ":Cannot join channel (+l)");
+		return (CMD_ERROR);
+	}
+
 	// Use existing Channel method
 	if (channel->inviteClient(client, *target)) {
 		// Send INVITE to target user
 		sendResponse(*target, ":" + client.get_nick() + " INVITE " + targetNick + " " + channelName);
+		target->addChannel(channel, "");
+		channel->addClient(*target, "");
+		channel->addInvitedClient(*target);
 		// Confirm to inviter
 		sendResponse(client, ":server 341 " + client.get_nick() + " " + targetNick + " " + channelName);
 		return (CMD_OK);

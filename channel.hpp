@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   channel.hpp                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/10/06 13:09:27 by ppeckham          #+#    #+#             */
+/*   Updated: 2025/10/06 13:09:28 by ppeckham         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef CHANNEL_HPP
 # define CHANNEL_HPP
 
@@ -49,6 +61,7 @@ public:
 	size_t		getClientCount( void ) const;
 	bool		addOperator( Client& client );
 	bool		removeOperator( const Client& client );
+	bool		addInvitedClient( Client& client );
 	bool		removeInvitedClient( const Client& client );
 	bool		isOperator( const Client& client );
 	bool		isInvitedClient( const Client& client );
@@ -61,6 +74,7 @@ public:
 	bool		validateKey( const std::string& key );
 	bool		isInviteOnly( void );
 	bool		isTopicRestricted( void );
+	bool		isFull( void );
 	bool		broadcastMessage( const std::string message );
 	bool		canJoin( Client& client, const std::string& key );
 	std::list<Client*>	getClientList( void ) const;

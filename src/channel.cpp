@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   channel.cpp                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/10/06 13:08:29 by ppeckham          #+#    #+#             */
+/*   Updated: 2025/10/06 13:08:30 by ppeckham         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 # include "channel.hpp"
 # include "client.hpp"
 
@@ -124,6 +136,20 @@ bool	Channel::removeOperator(const Client& client)
 		if (&client == *it)
 		{
 			this->_operators.erase(it);
+			return (true);
+		}
+	}
+	return (false);
+}
+
+bool	Channel::addInvitedClient(Client& client)
+{
+	for (std::list<Client*>::iterator it = this->_invited_clients.begin();
+		it != this->_invited_clients.end(); it++)
+	{
+		if (&client == *it)
+		{
+			this->_invited_clients.push_back(*it);
 			return (true);
 		}
 	}
@@ -319,6 +345,13 @@ bool	Channel::isTopicRestricted(void)
 	return (false);
 }
 
+bool	Channel::isFull(void)
+{
+	if (this->_has_client_limit && this->_client_limit <= this->_client_list.size())
+		return (true);
+	return (false);
+}
+
 bool	Channel::broadcastMessage(const std::string message)
 {
 	if (_client_list.empty())
@@ -357,7 +390,7 @@ bool	Channel::canJoin(Client& client, const std::string& key)
 		return (false);
 	if (this->_invite_only && !isInvitedClient(client))
 		return (false);
-	if (this->_has_client_limit && this->_client_limit <= this->_client_list.size())
+	if (isFull())
 		return (false);
 	if (!validateKey(key))
 		return (false);
