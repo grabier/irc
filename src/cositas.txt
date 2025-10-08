@@ -21,3 +21,5 @@ USER Cab 0 * 0
 PASS 1234
 NICK Meck
 USER Ab 0 * 0
+
+:ppeckham__ JOIN #testeo1

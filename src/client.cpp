@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:09:41 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/06 13:09:42 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/08 15:36:30 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,8 +71,6 @@ void	Client::set_register_status(bool status)
 
 bool	Client::isAuthenticated(void) const 
 {
-	// Must be set to true in server when handling password
-	//void Server::handlePassCommand(Client* client, const std::string& password)
 	return (this->_isAuthenticated);
 }
 

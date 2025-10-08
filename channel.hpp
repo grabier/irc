@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:09:27 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/06 16:00:09 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/08 15:50:50 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,8 @@
 # include <stdint.h>
 
 class	Client;
+
+class CommandRouter;
 
 class	Channel
 {
@@ -68,7 +70,7 @@ public:
 	bool		isInvitedClient( const Client& client );
 	bool		setTopic( std::string& topic, Client& client );
 	std::string	getTopic( void ) const;
-	bool		kickClient( const Client& kicker, Client& target );
+	bool		kickClient( Client& kicker, Client& target, std::string reason );
 	bool		inviteClient( Client & inviter, Client& client );
 	bool		setMode( char mode, std::string param, Client& requester, Client& target );
 	bool		removeMode( char mode, Client& requester, Client& target );
@@ -76,8 +78,9 @@ public:
 	bool		isInviteOnly( void );
 	bool		isTopicRestricted( void );
 	bool		isFull( void );
-	bool		broadcastMessage( const std::string message );
+	bool		broadcastMessage( const std::string message, Client& requester );
 	bool		canJoin( Client& client, const std::string& key );
+	std::string	getModeString( void );
 	std::list<Client*>	getClientList( void ) const;
 
 };

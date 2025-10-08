@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:08:29 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/06 16:45:28 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/08 16:04:16 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -135,6 +135,20 @@ bool	Channel::addOperator(Client& client)
 
 bool	Channel::removeOperator(const Client& client)
 {
+	if (this->_operators.size() == 1)
+	{
+		for (std::list<Client*>::iterator it = this->_client_list.begin();
+			it != this->_client_list.end(); it++)
+		{
+			if (&client != *it)
+			{
+				this->_operators.push_back(*it);
+				CommandRouter* router = NULL;
+				router->sendResponse(**it, ":localhost MODE " + this->getName() + " +o "+ (*it)->get_nick());
+				break;
+			}
+		}
+	}
 	for (std::list<Client*>::iterator it = this->_operators.begin();
 		it != this->_operators.end(); it++)
 	{
@@ -199,17 +213,14 @@ std::string	Channel::getTopic(void) const
 	return (this->_topic);
 }
 
-bool	Channel::kickClient(const Client& kicker, Client& target)
+bool	Channel::kickClient(Client& kicker, Client& target, std::string reason)
 {
 	if (!isOperator(kicker))
 		return (false);
-	if (isOperator(target))
-		removeOperator(target);
-	if (isInvitedClient(target))
-		removeInvitedClient(target);
 	if (removeClient(target))
 	{
-		broadcastMessage(target.get_user() + " has been kicked out!");
+		broadcastMessage(":" + kicker.get_nick() + "!" + kicker.get_user() + "@localhost KICK " + this->getName() + " " + target.get_nick() + " :" + reason, kicker);
+		target.removeChannel(this);
 		return (true);
 	}
 	return (false);
@@ -247,6 +258,8 @@ bool	Channel::setMode(char mode, std::string param, Client& requester, Client& t
 	}
 	if (mode == 'k')
 	{
+		if (param == "")
+			return (false);
 		(void)requester;
 		(void)target;
 		this->_has_key = true;
@@ -349,7 +362,7 @@ bool	Channel::isFull(void)
 	return (false);
 }
 
-bool	Channel::broadcastMessage(const std::string message)
+bool	Channel::broadcastMessage(const std::string message, Client& requester)
 {
 	if (_client_list.empty())
 		return false;
@@ -366,16 +379,19 @@ bool	Channel::broadcastMessage(const std::string message)
 			it != _client_list.end(); ++it)
 	{
 		Client* client = *it;
-		ssize_t bytes_sent = send(client->get_sock_fd(), 
-									formatted_message.c_str(), 
-									formatted_message.length(), 
-									MSG_NOSIGNAL);
-	
-		if (bytes_sent == -1)
+		if (client != &requester)
 		{
-			// Log error or handle disconnected client
-			std::cout << "bytes_sent == -1\n";
-			continue;
+			ssize_t bytes_sent = send(client->get_sock_fd(), 
+										formatted_message.c_str(), 
+										formatted_message.length(), 
+										MSG_NOSIGNAL);
+		
+			if (bytes_sent == -1)
+			{
+				// Log error or handle disconnected client
+				std::cout << "bytes_sent == -1\n";
+				continue;
+			}
 		}
 	}
 	return true;
@@ -392,6 +408,21 @@ bool	Channel::canJoin(Client& client, const std::string& key)
 	if (!validateKey(key))
 		return (false);
 	return (true);
+}
+std::string	Channel::getModeString(void)
+{
+	std::string result = "";
+	if (this->isTopicRestricted())
+		result += "t";
+	if (this->isInviteOnly())
+		result += "i";
+	if (this->_has_client_limit)
+		result += "l";
+	if (this->_has_key)
+		result += "k";
+	if (this->getOperatorCount() > 0)
+		result += "o";
+	return (result);
 }
 
 std::list<Client*>	Channel::getClientList(void) const

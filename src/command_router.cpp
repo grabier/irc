@@ -6,7 +6,7 @@
 /*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/10/06 16:41:31 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/08 16:02:22 by ppeckham         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -212,17 +212,21 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 	}
 
 	// Get or create channel
-	Channel* channel = _server.getChannelByName(channelName);
+	Channel* channel = _server.getChannelByName(channelName);	
 	if (!channel) {
 		channel = _server.createChannel(channelName);
 		// First user becomes operator
-		//std::cout << "añadimos a " << client.get_nick() << " de operator\n";
-		channel->addClient(client, key);
+		client.addChannel(channel, key);
 		channel->addOperator(client);
 	}
-
-	// Use existing Client method (which validates and calls Channel methods)
-	client.addChannel(channel, key);
+	else
+	{
+		if (client.isInChannel(channel)) {
+			sendError(client, "443", client.get_nick() + " " + channelName + " :is already on channel");
+			return (CMD_ERROR);
+		}
+		client.addChannel(channel, key); // Use existing Client method (which validates and calls Channel methods)
+	}
 
 	// Check if join was successful
 	if (client.isInChannel(channel)) {
@@ -247,15 +251,15 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 		
 		// Notify other users in channel
 		if (channel->getClientList().size() != 1 && channel->getClientList().size() > 0)
-			channel->broadcastMessage(":" + client.get_nick() + " JOIN " + channelName);
+			channel->broadcastMessage(test + " JOIN " + channelName, client);
 		return (CMD_OK);
 	}
 	else {
 		// Join failed - channel methods already handle the reason
 		if (channel->isFull())
-			sendError(client, "471", client.get_nick() + " " + channelName + ":Cannot join channel (+l)");
+			sendError(client, "471", " " + channelName + ":Cannot join channel (+l)");
 		else
-			sendError(client, "473", channelName + " :Cannot join channel");
+			sendError(client, "473", " " + channelName + " :Cannot join channel (+k)");
 		return CMD_ERROR;
 	}
 }
@@ -285,10 +289,12 @@ CommandRouter::CommandResult	CommandRouter::handlePART(Client& client, const Mes
 	if (!reason.empty()) {
 		partMsg += " :" + reason;
 	}
-	channel->broadcastMessage(partMsg);
+	channel->broadcastMessage(partMsg, client);
+	sendResponse(client, ":" + client.get_nick() + "!" + client.get_user() + "@localhost PART " + channel->getName() + " :" + reason);
 
 	// Use existing Client method to leave channel
 	client.removeChannel(channel);
+	channel->removeClient(client);
 
 	// Remove empty channel
 	if (channel->getClientCount() == 0) {
@@ -330,15 +336,18 @@ CommandRouter::CommandResult	CommandRouter::handleTOPIC(Client& client, const Me
 	else {
 		// Set topic
 		std::string topic = msg.getParamAt(1);
+		for (size_t i = 2; msg.getParamAt(i) != ""; i++)
+			topic = topic + " " + msg.getParamAt(i);
 		std::string topic_copy = topic;
 		
 		if (channel->setTopic(topic_copy, client)) {
 			// Success - broadcast to channel
-			channel->broadcastMessage(":" + client.get_nick() + " TOPIC " + channelName + " :" + topic);
+			channel->broadcastMessage(":" + client.get_nick() + " TOPIC " + channelName + " :" + topic, client);
+			sendResponse(client, ":" + client.get_nick() + "!" + client.get_user() + "@localhost TOPIC " + channel->getName() + " :" + topic);
 			return (CMD_OK);
 		} 
 		else {
-			sendError(client, "482", channelName + " :You're not channel operator");
+			sendError(client, "482 ", + " " + channelName + " :You're not channel operator");
 			return (CMD_ERROR);
 		}
 	}
@@ -370,12 +379,19 @@ CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Mes
 
 		if (msg.getParamCount() == 1) {
 			// Query channel modes
-			sendResponse(client, ":server 324 " + client.get_nick() + " " + target + " +nt");
+			sendResponse(client, ":server 324 " + client.get_nick() + " " + target + " +" + channel->getModeString());
 			return (CMD_OK);
 		}
 
 		std::string modeString = msg.getParamAt(1);
-		std::string param = (msg.getParamCount() > 2) ? msg.getParamAt(2) : "";
+		std::vector<std::string> param_vector;
+		if (msg.getParamCount() > 2)
+		{
+			for (size_t param = 2; param < msg.getParamCount(); param++)
+				param_vector.push_back(msg.getParamAt(param));
+		}
+		else
+			param_vector.push_back("");
 		
 		if (modeString.empty()) {
 			return (CMD_ERROR);
@@ -386,22 +402,36 @@ CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Mes
 			return (CMD_ERROR);
 		}
 
+		size_t param_index = 0;
 		for (std::size_t i = 1; i < modeString.length(); ++i) {
+			if (modeString[i] == '+')
+			{
+				adding = true;
+				i++;
+			}
+			else if (modeString[i] == '-')
+			{
+				adding = false;
+				i++;
+			}
+			else if (modeString[i] != 'i' && modeString[i] != 't' && modeString[i] != 'k'
+				&& modeString[i] != 'o' && modeString[i] != 'l')
+				return (CMD_ERROR);
 			char mode = modeString[i];
 			
 			// For modes that affect other users (like 'o'), need target client
 			Client* targetClient = &client;
-			if (mode == 'o' && !param.empty()) {
-				targetClient = _server.getClientByNick(param);
+			if (mode == 'o') {
+				targetClient = _server.getClientByNick(param_vector[param_index]);
 				if (!targetClient) {
-					sendError(client, "401", param + " :No such nick/channel");
+					sendError(client, "401", " " + param_vector[param_index] + " :No such nick/channel");
 					continue ;
 				}
 			}
 
 			bool success;
 			if (adding) {
-				success = channel->setMode(mode, param, client, *targetClient);
+				success = channel->setMode(mode, param_vector[param_index], client, *targetClient);
 			}
 			else {
 				success = channel->removeMode(mode, client, *targetClient);
@@ -409,21 +439,26 @@ CommandRouter::CommandResult	CommandRouter::handleMODE(Client& client, const Mes
 
 			if (success) {
 				// Broadcast mode change
-				std::string modeChange = ":" + client.get_nick() + " MODE " + target + " " + 
-										(adding ? "+" : "-") + mode;
-				if (!param.empty()) {
-					modeChange += " " + param;
+				std::string sign = "";
+				adding ? sign = "+" : sign = "-";
+				std::string modeChange = ":" + client.get_nick() + "!" + client.get_user() + "@localhost MODE " + channel->getName() + " " + sign + modeString[i];
+				if (!param_vector[param_index].empty()) {
+					modeChange += " " + param_vector[param_index];
 				}
-				channel->broadcastMessage(modeChange);
+				channel->broadcastMessage(modeChange, client);
+				sendResponse(client, modeChange);
 			} 
 			else {
 				if (!channel->isOperator(client))
 					sendError(client, "482", target + " :You're not channel operator");
-				else if (!targetClient->isInChannel(channel))
+				else if (targetClient->get_nick() != "" && !targetClient->isInChannel(channel))
 					sendError(client, "441", client.get_nick() + " " + targetClient->get_nick()
 						+ channel->getName() + " :They're not in channel");
+				else
+					sendError(client, "461", " MODE :Not enough parameters");
 				return (CMD_ERROR);
 			}
+			param_index++;
 		}
 		return (CMD_OK);
 	}
@@ -467,10 +502,11 @@ CommandRouter::CommandResult	CommandRouter::handleKICK(Client& client, const Mes
 	}
 
 	// Use existing Channel method
-	if (channel->kickClient(client, *target)) {
+	if (channel->kickClient(client, *target, reason)) {
 		// Success - Channel::kickClient already broadcasts
 		// Send KICK message to the kicked user specifically
-		sendResponse(*target, ":" + client.get_nick() + " KICK " + channelName + " " + targetNick + " :" + reason);
+		sendResponse(*target, ":" + client.get_nick() + "!" + client.get_user() + "@localhost KICK " + channel->getName() + " " + target->get_nick() + " :" + reason);
+		sendResponse(client, ":" + client.get_nick() + "!" + client.get_user() + "@localhost KICK " + channel->getName() + " " + target->get_nick() + " :" + reason);
 		return (CMD_OK);
 	}
 	else {
@@ -542,6 +578,8 @@ CommandRouter::CommandResult	CommandRouter::handlePRIVMSG(Client& client, const 
 
 	std::string target = msg.getParamAt(0);
 	std::string message = msg.getParamAt(1);
+	std::cout << "TARGET: " << target << std::endl;
+	std::cout << "MESSAGE: " << message << std::endl;
 
 	if (target[0] == '#') {
 		// Channel message
@@ -558,7 +596,7 @@ CommandRouter::CommandResult	CommandRouter::handlePRIVMSG(Client& client, const 
 
 		// Use existing Channel method to broadcast
 		std::string fullMsg = ":" + client.get_nick() + " PRIVMSG " + target + " :" + message;
-		channel->broadcastMessage(fullMsg);
+		channel->broadcastMessage(fullMsg, client);
 		return (CMD_OK);
 	}
 	else {
@@ -588,7 +626,7 @@ CommandRouter::CommandResult	CommandRouter::handleNOTICE(Client& client, const M
 		Channel* channel = _server.getChannelByName(target);
 		if (channel && client.isInChannel(channel)) {
 			std::string fullMsg = ":" + client.get_nick() + " NOTICE " + target + " :" + message;
-			channel->broadcastMessage(fullMsg);
+			channel->broadcastMessage(fullMsg, client);
 		}
 	}
 	else {
@@ -631,8 +669,11 @@ CommandRouter::CommandResult	CommandRouter::handleQUIT(Client& client, const Mes
 	// Notify all channels the client is in
 	std::list<Channel*> channels = client.getChannels();
 	for (std::list<Channel*>::iterator it = channels.begin(); it != channels.end(); ++it) {
-		(*it)->broadcastMessage(":" + client.get_nick() + " QUIT :" + reason);
+		(*it)->broadcastMessage(":" + client.get_nick() + "!" + client.get_user() + "@localhost QUIT :" + reason, client);
 		client.removeChannel(*it);
+		if ((*it)->getClientCount() == 0) {
+			_server.removeChannel((*it)->getName());
+		}
 	}
 
 	// Signal that client should be disconnected
@@ -701,6 +742,14 @@ bool			CommandRouter::validateNickname(const std::string& nick) const {
 
 std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
 	std::list<Client*> clients = channel.getClientList();
+	if (clients.empty())
+		return ("");
+	else{
+		for (std::list<Client*>::iterator it = clients.begin(); it != clients.end(); ++it)
+		{
+			std::cout << "USER IN USER LIST: " << (*it)->get_nick() << std::endl;
+		}
+	}
 	std::string userList;
 	
 	for (std::list<Client*>::iterator it = clients.begin(); it != clients.end(); ++it) {
@@ -712,6 +761,8 @@ std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
 		if (channel.isOperator(**it)) {
 			userList += "@";
 		}
+
+		std::cout << "USER IN USER LIST: " << (*it)->get_nick() << std::endl;
 		
 		userList += (*it)->get_nick();
 	}
