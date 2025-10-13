@@ -6,7 +6,7 @@
 /*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/10/13 14:52:24 by gmontoro         ###   ########.fr       */
+/*   Updated: 2025/10/13 15:14:04 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,7 +54,6 @@ CommandRouter::CommandResult	CommandRouter::processCommand(int client_fd, const 
 	}
 
 	std::string command = msg.getCommand();
-	//std::cout << "command : " <<  command << std::endl;
 	if (command == "CAP")
 		return (handleCAP(*client, msg));
 		
