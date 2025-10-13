@@ -6,7 +6,7 @@
 /*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/18 23:35:34 by sstoev            #+#    #+#             */
-/*   Updated: 2025/09/29 17:02:06 by gmontoro         ###   ########.fr       */
+/*   Updated: 2025/10/13 14:02:06 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,7 +24,7 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 	std::string	prefix;
 	std::string	command;
 	std::vector<std::string>	params;
-	//std::cout << "line: " << rawMessage << std::endl;
+
 	// Remove trailing CR+LF if present
 	std::string message = rawMessage;
 	if (message.size() >= 2 &&
@@ -32,7 +32,7 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 		message[message.size() - 1] == '\n') {
 			message = message.substr(0, message.size() - 2);
 	}
-	//std::cout << "line: " << message << std::endl;
+
 	// Handle empty message
 	if (message.empty()) {
 		return (Message("", "", std::vector<std::string>()));
@@ -44,7 +44,6 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 		pos = message.find(' ');
 		if (pos == std::string::npos) {
 			// Invalid message format
-			// TODO: revisit later if better handling needed once we centralise error utility, currently we handle it silently
 			return (Message("", "", std::vector<std::string>()));
 		}
 		prefix = message.substr(1, pos - 1);
@@ -83,13 +82,12 @@ Message	Parser::parseMessage(const std::string& rawMessage) const {
 			}
 		}
 	}
-	//std::cout << "params: " << params[0] << std::endl;
+
 	// Convert command to uppercase (IRC commands are case-insensitive)
 	std::string uppercaseCommand = command;
 	for (std::size_t i = 0; i < uppercaseCommand.size(); i++) {
 		uppercaseCommand[i] = std::toupper(static_cast<unsigned char>(uppercaseCommand[i]));
 	}
-	//std::cout << "command: " << uppercaseCommand << std::endl;
 	return (Message(prefix, uppercaseCommand, params));
 }
 

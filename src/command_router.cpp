@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   command_router.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/09/19 14:15:09 by sstoev            #+#    #+#             */
-/*   Updated: 2025/10/08 16:02:22 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/13 14:52:24 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,10 +25,10 @@ CommandRouter::CommandRouter(Server& server) : _server(server) {
 CommandRouter::~CommandRouter(void) { }
 
 void	CommandRouter::initCommandHandlers(void) {
-	_commandHandlers["PASS"] = &CommandRouter::handlePASS;//ok
+	_commandHandlers["PASS"] = &CommandRouter::handlePASS;
 	_commandHandlers["CAP"] = &CommandRouter::handleCAP;
-	_commandHandlers["NICK"] = &CommandRouter::handleNICK;//ok
-	_commandHandlers["USER"] = &CommandRouter::handleUSER;//ok
+	_commandHandlers["NICK"] = &CommandRouter::handleNICK;
+	_commandHandlers["USER"] = &CommandRouter::handleUSER;
 	_commandHandlers["JOIN"] = &CommandRouter::handleJOIN;
 	_commandHandlers["PART"] = &CommandRouter::handlePART;
 	_commandHandlers["PRIVMSG"] = &CommandRouter::handlePRIVMSG;
@@ -54,7 +54,7 @@ CommandRouter::CommandResult	CommandRouter::processCommand(int client_fd, const 
 	}
 
 	std::string command = msg.getCommand();
-	std::cout << "command : " <<  command << std::endl;
+	//std::cout << "command : " <<  command << std::endl;
 	if (command == "CAP")
 		return (handleCAP(*client, msg));
 		
@@ -242,8 +242,6 @@ CommandRouter::CommandResult	CommandRouter::handleJOIN(Client& client, const Mes
 		
 		// Send user list
 		std::string userList = formatChannelUserList(*channel);
-		//std::cout << "userlist: "<< userList << std::endl;
-		
 		sendResponse(client, test +  " 353 " + client.get_nick() + " = " + 
 					channelName + " :" + userList);
 		sendResponse(client, test + " 366 " + client.get_nick() + " " + 
@@ -578,8 +576,8 @@ CommandRouter::CommandResult	CommandRouter::handlePRIVMSG(Client& client, const 
 
 	std::string target = msg.getParamAt(0);
 	std::string message = msg.getParamAt(1);
-	std::cout << "TARGET: " << target << std::endl;
-	std::cout << "MESSAGE: " << message << std::endl;
+	//std::cout << "TARGET: " << target << std::endl;
+	//std::cout << "MESSAGE: " << message << std::endl;
 
 	if (target[0] == '#') {
 		// Channel message
@@ -744,12 +742,6 @@ std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
 	std::list<Client*> clients = channel.getClientList();
 	if (clients.empty())
 		return ("");
-	else{
-		for (std::list<Client*>::iterator it = clients.begin(); it != clients.end(); ++it)
-		{
-			std::cout << "USER IN USER LIST: " << (*it)->get_nick() << std::endl;
-		}
-	}
 	std::string userList;
 	
 	for (std::list<Client*>::iterator it = clients.begin(); it != clients.end(); ++it) {
@@ -761,9 +753,6 @@ std::string		CommandRouter::formatChannelUserList(Channel& channel) const {
 		if (channel.isOperator(**it)) {
 			userList += "@";
 		}
-
-		std::cout << "USER IN USER LIST: " << (*it)->get_nick() << std::endl;
-		
 		userList += (*it)->get_nick();
 	}
 	

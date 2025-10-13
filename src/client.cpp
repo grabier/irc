@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   client.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:09:41 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/08 15:36:30 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/13 13:57:18 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -149,6 +149,5 @@ std::string	Client::extractCompleteMessage(void)
 		this->_message_buffer.erase(0, pos + 2);
 		return (result);
 	}
-	//std::cout << "line after trim: " <<_message_buffer << std::endl;
 	return ("");
 }

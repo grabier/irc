@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   channel.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ppeckham <ppeckham@student.42.fr>          +#+  +:+       +#+        */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/06 13:08:29 by ppeckham          #+#    #+#             */
-/*   Updated: 2025/10/08 16:04:16 by ppeckham         ###   ########.fr       */
+/*   Updated: 2025/10/13 14:52:47 by gmontoro         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -239,7 +239,7 @@ bool	Channel::inviteClient(Client&inviter, Client& client)
 bool	Channel::setMode(char mode, std::string param, Client& requester, Client& target)
 {
 	if (!isOperator(requester))
-		return (std::cout << "cliente no es operator\n", false);
+		return (std::cout << "Client isn't an operator\n", false);
 	if (mode == 'i')
 	{
 		(void)param;

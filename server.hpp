@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   server.hpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: gmontoro <gmontoro@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/10/13 14:54:02 by gmontoro          #+#    #+#             */
+/*   Updated: 2025/10/13 14:54:03 by gmontoro         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
@@ -11,7 +23,7 @@
 # include <poll.h>
 # include <list>
 # include <vector>
-# include <netinet/in.h>//pa sockaddr_in
+# include <netinet/in.h>
 # include <stdint.h>
 # include "client.hpp"
 # include "channel.hpp"
@@ -25,9 +37,8 @@ class Server{
 		int	port;
 		std::string pass;
 		int	sock;
-		sockaddr_in	dir;//direccion de socket ipv4
-		std::vector<struct pollfd> pollfd;//tendremos un pollfd para el server
-		//y luego uno por cliente q se conecte
+		sockaddr_in	dir;
+		std::vector<struct pollfd> pollfd;
 		std::vector<Client *> client_list;
 
 		// Add extra for channel/ commands integration
